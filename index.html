@@ -8,13 +8,14 @@
 <meta name="theme-color" content="#96b3d4">
 <title>Spa Chairs</title>
 <style>
-  /* light look: blue-grey room, each chair its own pastel. Alerts (ending, up) stay amber and red. */
+  /* light look: blue-grey room, each chair its own pastel. Alerts (ending, up) stay amber and red; seen is gold with a shine. */
   :root {
     --bg: #96b3d4; --ink: #1d2733; --dim: rgba(29,39,51,.62); --line: rgba(29,39,51,.14);
     --btn: rgba(255,255,255,.55); --btn-on: #ffffff;
     --ending: #e08a00; --ending-ink: #9a4f00;
     --up: #d7261e; --up-ink: #ffffff; --flash: #e9837c; --alert: #5c0805;
-    --live: #1f9d55; --pick: #ffffff;
+    --seen: #ffc370; --seen-word: #3e5671;
+    --live: #1f9d55;
     color-scheme: light;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -52,20 +53,22 @@
   /* --c is the chair's own colour, set per box in the script */
   .chair {
     border-radius: 18px; background: var(--c); color: var(--ink);
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 22px 8px 12px;
     position: relative; min-height: 0; min-width: 0; cursor: pointer; transition: background .25s, box-shadow .25s;
+    container-type: size;
   }
-  .chair .num { font-size: clamp(28px, 8vmin, 72px); font-weight: 800; line-height: 1; }
-  .chair .word { font-size: clamp(10px, 2vmin, 15px); letter-spacing: .12em; text-transform: uppercase; color: var(--dim); text-align: center; font-weight: 600; }
-  .chair .time { font-size: clamp(24px, 7vmin, 64px); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; min-height: 1.1em; }
-  .chair .sub { font-size: clamp(10px, 2vmin, 14px); color: var(--dim); font-variant-numeric: tabular-nums; min-height: 1.2em; }
-  .chair .count { position: absolute; right: 10px; bottom: 8px; font-size: clamp(10px, 2vmin, 14px); color: var(--dim); }
+  /* top to bottom: word, big number, sub, timer (Johno's sketch, 2026-10-15). Sizes follow the box (cqw/cqh). */
+  .chair .word { order: 1; font-size: max(12px, min(16cqw, 8cqh)); font-weight: 800; line-height: 1.1; text-transform: uppercase; color: var(--dim); text-align: center; }
+  .chair .num { order: 2; flex: 1; display: flex; align-items: center; font-size: min(85cqw, 42cqh); font-weight: 800; line-height: 1; }
+  .chair .sub { order: 3; font-size: clamp(10px, 2vmin, 14px); color: var(--dim); font-variant-numeric: tabular-nums; min-height: 1.2em; }
+  .chair .time { order: 4; font-size: min(27cqw, 14cqh); font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; min-height: 1.1em; }
+  .chair .count { position: absolute; right: 10px; top: 6px; font-size: clamp(10px, 2vmin, 14px); color: var(--dim); }
   .chair .prompt {
     position: absolute; left: 0; right: 0; bottom: 8px; text-align: center; padding: 0 10px;
     font-size: clamp(9px, 1.8vmin, 13px); color: var(--dim); line-height: 1.25; display: none;
   }
   body.prompts .chair .prompt { display: block; }
-  body.prompts .chair .count { bottom: auto; top: 8px; }
+  body.prompts .chair { padding-bottom: 44px; }
 
   .chair.waiting .num { opacity: .55; }
   .chair.ending { box-shadow: inset 0 0 0 6px var(--ending); }
@@ -73,17 +76,44 @@
   .chair.up { background: var(--up); color: var(--up-ink); animation: lit .9s ease-in-out infinite alternate; }
   .chair.up .word, .chair.up .sub, .chair.up .count { color: rgba(255,255,255,.85); }
   @keyframes lit { from { filter: brightness(1); } to { filter: brightness(1.25); } }
-  .chair.seen { box-shadow: inset 0 0 0 6px var(--up); }
-  .chair.seen .word { color: var(--up); }
+  /* seen = gold border; a band of the same gold is added on top of the border only (not the box), sweeping across.
+     Timing in frames at 60 fps (Johno, 2026-10-15): sweep 111, hold 22, wait 4, sweep 22, hold 22, loop (181 = 3.017 s) */
+  .chair.seen { box-shadow: inset 0 0 0 6px var(--seen); }
+  .chair.seen .word { color: var(--seen-word); padding: 0 6px; font-size: max(11px, min(10cqw, 5cqh)); }
+  .chair.seen::after {
+    content: ""; position: absolute; inset: 0; padding: 6px; border-radius: inherit; pointer-events: none;
+    background: linear-gradient(110deg, transparent 40%, var(--seen) 50%, transparent 60%) no-repeat;
+    background-size: 300% 100%; background-position: 100% 0;
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude;
+    mix-blend-mode: plus-lighter;
+    animation: shine 3.017s infinite;
+  }
+  @keyframes shine {
+    0%      { background-position: 100% 0; animation-timing-function: ease-in-out; }
+    61.33%  { background-position: 0% 0; }
+    61.34%  { background-position: 100% 0; }
+    75.69%  { background-position: 100% 0; animation-timing-function: ease-in-out; }
+    87.85%  { background-position: 0% 0; }
+    100%    { background-position: 0% 0; }
+  }
   .chair.confirm { box-shadow: inset 0 0 0 4px var(--ink); }
-  .chair.picked { box-shadow: inset 0 0 0 5px var(--pick), 0 0 0 2px var(--ink); }
+  /* Layout: tap the spots in order 1..6; each tapped spot shows the chair number it will get */
+  .chair .badge {
+    position: absolute; inset: 0; border-radius: inherit; display: none; align-items: center; justify-content: center;
+    background: var(--bc); color: var(--ink); box-shadow: inset 0 0 0 5px var(--ink); font-weight: 800; font-size: min(85cqw, 42cqh); z-index: 1;
+  }
+  body.layout .chair .badge:not(:empty) { display: flex; }
+  header .layoutTip { font-weight: 800; font-size: 17px; color: var(--ink); display: none; }
+  body.layout header .layoutTip { display: block; }
+  body.layout header .title, body.layout header .alert { display: none; }
   body.layout .chair { outline: 2px dashed rgba(29,39,51,.4); outline-offset: -8px; }
 
   footer { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 6px 14px 12px; font-size: 13px; color: var(--dim); }
   footer .hint { flex: 1; min-width: 0; }
   footer .tally { font-variant-numeric: tabular-nums; cursor: pointer; font-weight: 600; }
   @media (max-width: 480px) { footer .hint { display: none; } footer .tally { margin-left: auto; } }
-  @media (prefers-reduced-motion: reduce) { body.flash, .chair.up { animation: none; } body.flash { background: var(--flash); } }
+  @media (prefers-reduced-motion: reduce) { body.flash, .chair.up, .chair.seen::after { animation: none; } body.flash { background: var(--flash); } }
 
   /* the QR sheet and the no-room screen */
   .sheet {
@@ -102,6 +132,7 @@
 <header>
   <div class="title">Spa chairs</div>
   <div class="alert" id="alert">Chair is up</div>
+  <div class="layoutTip" id="layoutTip"></div>
   <div class="sync" id="sync"><i></i><span>connecting</span></div>
   <div class="spacer"></div>
   <div class="minutes">
@@ -147,7 +178,7 @@
   };
   // each chair's own colour, in chair-number order (Johno's palette, 2026-10-14)
   const CHAIR_COLOURS = ["#f4bcbb", "#d4fccb", "#9acefb", "#5d9cf8", "#fbe596", "#e78ff9"];
-  const WORD = { waiting: "free", running: "running", ending: "ending", up: "time's up", seen: "seen" };
+  const WORD = { waiting: "free", running: "running", ending: "ending", up: "time's up", seen: "seen - next guest seated chair on vr play ready" };
 
   const room = decodeURIComponent(location.hash.slice(1)).replace(/[^A-Za-z0-9_-]/g, "");
   if (!room) {
@@ -166,7 +197,7 @@
   const chairs = {};
   for (let i = 1; i <= 6; i++) chairs[i] = blank(i);
   let settings = { minutes: 5, warnSeconds: 60 };
-  let layoutMode = false, picked = null, confirmId = null, confirmTimer = null;
+  let layoutMode = false, order = [], confirmId = null, confirmTimer = null;
 
   const grid = document.getElementById("grid");
   const boxes = {};
@@ -174,7 +205,7 @@
     const el = document.createElement("div");
     el.className = "chair waiting";
     el.style.setProperty("--c", CHAIR_COLOURS[i - 1]);
-    el.innerHTML = '<div class="num">' + i + '</div><div class="word"></div><div class="time"></div><div class="sub"></div><div class="count"></div><div class="prompt"></div>';
+    el.innerHTML = '<div class="num">' + i + '</div><div class="word"></div><div class="time"></div><div class="sub"></div><div class="count"></div><div class="prompt"></div><div class="badge"></div>';
     el.addEventListener("click", () => onTap(i));
     boxes[i] = el; grid.appendChild(el);
   }
@@ -229,9 +260,15 @@
     for (const id in chairs) if (effective(chairs[id]) === "up") saveChair({ ...chairs[id], state: "seen", since: now() });
     render();
   }
-  function swap(a, b) {
-    const ca = chairs[a], cb = chairs[b];
-    saveChair({ ...ca, pos: cb.pos }); saveChair({ ...cb, pos: ca.pos });
+  // Layout: order[n-1] = the spot (pos) chair n goes to, in the order the spots were tapped
+  function placeAt(spot) {
+    if (order.includes(spot)) return;
+    order.push(spot);
+    if (order.length === 5) order.push([0, 1, 2, 3, 4, 5].find(p => !order.includes(p)));
+    if (order.length === 6) {
+      for (let n = 1; n <= 6; n++) saveChair({ ...chairs[n], pos: order[n - 1] });
+      layoutMode = false; order = [];
+    }
     render();
   }
   function setMinutes(m) { saveSettings({ ...settings, minutes: Math.max(0.5, Math.min(60, m)) }); render(); }
@@ -239,9 +276,7 @@
 
   function onTap(id) {
     if (layoutMode) {
-      if (picked === null) { picked = id; render(); return; }
-      if (picked !== id) swap(picked, id);
-      picked = null; render(); return;
+      placeAt(chairs[id].pos); return;
     }
     const st = effective(chairs[id]);
     if (st === "running" || st === "ending") {
@@ -260,7 +295,11 @@
     for (const c of list) {
       const el = boxes[c.id], st = effective(c);
       el.style.order = c.pos;
-      el.className = "chair " + st + (confirmId === c.id ? " confirm" : "") + (picked === c.id ? " picked" : "");
+      el.className = "chair " + st + (confirmId === c.id ? " confirm" : "");
+      const n = order.indexOf(c.pos);
+      const badge = el.querySelector(".badge");
+      badge.textContent = layoutMode && n >= 0 ? n + 1 : "";
+      if (n >= 0) badge.style.setProperty("--bc", CHAIR_COLOURS[n]);
       el.querySelector(".word").textContent = confirmId === c.id ? "tap again to stop" : WORD[st];
       el.querySelector(".time").textContent = (st === "running" || st === "ending") ? fmt(c.endAt - now()) : (st === "up" ? "0:00" : "");
       el.querySelector(".sub").textContent = (st === "waiting" || st === "seen") ? "empty " + fmt(now() - c.since) : (st === "up" ? "up " + fmt(now() - upSince(c)) : "");
@@ -271,6 +310,7 @@
     document.body.classList.toggle("flash", anyUp);
     document.body.classList.toggle("layout", layoutMode);
     document.getElementById("layout").classList.toggle("on", layoutMode);
+    document.getElementById("layoutTip").textContent = layoutMode ? "Tap where chair " + (order.length + 1) + " goes" : "";
     const ups = list.filter(c => effective(c) === "up").sort((a, b) => a.pos - b.pos).map(c => c.id);
     document.getElementById("alert").textContent = ups.length ? "Chair " + ups.join(" + ") + (ups.length > 1 ? " are up" : " is up") : "";
     document.getElementById("minutes").textContent = fmtMin(settings.minutes);
@@ -281,7 +321,7 @@
 
   document.getElementById("minus").addEventListener("click", () => setMinutes(settings.minutes - 0.5));
   document.getElementById("plus").addEventListener("click", () => setMinutes(settings.minutes + 0.5));
-  document.getElementById("layout").addEventListener("click", () => { layoutMode = !layoutMode; picked = null; render(); });
+  document.getElementById("layout").addEventListener("click", () => { layoutMode = !layoutMode; order = []; render(); });
   document.getElementById("prompts").addEventListener("click", () => document.body.classList.toggle("prompts"));
 
   // QR of this exact link (room included), for the next phone to scan
@@ -306,7 +346,7 @@
 
   document.addEventListener("keydown", e => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
-    if (e.key === "Escape") { layoutMode = false; picked = null; clearConfirm(); document.getElementById("qrSheet").classList.remove("show"); return; }
+    if (e.key === "Escape") { layoutMode = false; order = []; clearConfirm(); document.getElementById("qrSheet").classList.remove("show"); return; }
     if (/^[1-6]$/.test(e.key)) { onTap(Number(e.key)); return; }
     if (Object.values(chairs).some(c => effective(c) === "up")) seenAll();
   });
