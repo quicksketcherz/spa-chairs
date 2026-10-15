@@ -4,17 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#0b0d10">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#96b3d4">
 <title>Spa Chairs</title>
 <style>
+  /* light look: blue-grey room, each chair its own pastel. Alerts (ending, up) stay amber and red. */
   :root {
-    --bg: #0b0d10; --ink: #f2f0ea; --dim: #7f8791; --line: #1f242b;
-    --waiting: #171b20; --running: #0f3a3d; --running-ink: #bff7f2;
-    --ending: #6b4a00; --ending-ink: #ffd36b;
-    --up: #b1261f; --up-ink: #ffe9e6; --seen: #4a1512; --seen-ink: #ffb3ab;
-    --flash: #4a0d0a; --live: #5fd38a; --pick: #9ecbff;
-    color-scheme: dark;
+    --bg: #96b3d4; --ink: #1d2733; --dim: rgba(29,39,51,.62); --line: rgba(29,39,51,.14);
+    --btn: rgba(255,255,255,.55); --btn-on: #ffffff;
+    --ending: #e08a00; --ending-ink: #9a4f00;
+    --up: #d7261e; --up-ink: #ffffff; --flash: #e9837c; --alert: #5c0805;
+    --live: #1f9d55; --pick: #ffffff;
+    color-scheme: light;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; margin: 0; }
@@ -28,8 +29,8 @@
   @keyframes pulse { from { background: var(--bg); } to { background: var(--flash); } }
 
   header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; flex: 0 0 auto; flex-wrap: wrap; }
-  header .title { font-weight: 600; letter-spacing: .04em; font-size: 15px; color: var(--dim); text-transform: uppercase; }
-  header .alert { font-weight: 700; font-size: 17px; color: #ff8a80; display: none; }
+  header .title { font-weight: 700; letter-spacing: .04em; font-size: 15px; color: var(--dim); text-transform: uppercase; }
+  header .alert { font-weight: 800; font-size: 17px; color: var(--alert); display: none; }
   body.flash header .alert { display: block; }
   body.flash header .title { display: none; }
   header .sync { font-size: 12px; color: var(--dim); display: flex; align-items: center; gap: 5px; }
@@ -37,25 +38,26 @@
   header .sync.live i { background: var(--live); }
   header .spacer { flex: 1; }
   button {
-    font: inherit; color: var(--ink); background: var(--waiting); border: 1px solid var(--line);
+    font: inherit; color: var(--ink); background: var(--btn); border: 1px solid var(--line);
     border-radius: 10px; padding: 8px 12px; font-size: 14px; min-height: 36px; cursor: pointer;
   }
-  button.on { background: #2a3340; border-color: #4a5a70; }
+  button.on { background: var(--btn-on); border-color: var(--ink); }
   .minutes { display: flex; align-items: center; gap: 6px; }
-  .minutes span { min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .minutes span { min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; font-weight: 700; }
 
   main {
     flex: 1 1 auto; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr);
     gap: 10px; padding: 4px 12px 10px; min-height: 0;
   }
+  /* --c is the chair's own colour, set per box in the script */
   .chair {
-    border-radius: 18px; background: var(--waiting); border: 2px solid transparent;
+    border-radius: 18px; background: var(--c); color: var(--ink);
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-    position: relative; min-height: 0; min-width: 0; cursor: pointer; transition: background .25s, border-color .25s;
+    position: relative; min-height: 0; min-width: 0; cursor: pointer; transition: background .25s, box-shadow .25s;
   }
-  .chair .num { font-size: clamp(28px, 8vmin, 72px); font-weight: 700; line-height: 1; }
-  .chair .word { font-size: clamp(10px, 2vmin, 15px); letter-spacing: .12em; text-transform: uppercase; color: var(--dim); text-align: center; }
-  .chair .time { font-size: clamp(24px, 7vmin, 64px); font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.1; min-height: 1.1em; }
+  .chair .num { font-size: clamp(28px, 8vmin, 72px); font-weight: 800; line-height: 1; }
+  .chair .word { font-size: clamp(10px, 2vmin, 15px); letter-spacing: .12em; text-transform: uppercase; color: var(--dim); text-align: center; font-weight: 600; }
+  .chair .time { font-size: clamp(24px, 7vmin, 64px); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; min-height: 1.1em; }
   .chair .sub { font-size: clamp(10px, 2vmin, 14px); color: var(--dim); font-variant-numeric: tabular-nums; min-height: 1.2em; }
   .chair .count { position: absolute; right: 10px; bottom: 8px; font-size: clamp(10px, 2vmin, 14px); color: var(--dim); }
   .chair .prompt {
@@ -65,22 +67,21 @@
   body.prompts .chair .prompt { display: block; }
   body.prompts .chair .count { bottom: auto; top: 8px; }
 
-  .chair.running { background: var(--running); color: var(--running-ink); }
-  .chair.running .word { color: #7fcfc8; }
-  .chair.ending { background: var(--ending); color: var(--ending-ink); }
-  .chair.ending .word, .chair.ending .sub { color: #e0b65a; }
+  .chair.waiting .num { opacity: .55; }
+  .chair.ending { box-shadow: inset 0 0 0 6px var(--ending); }
+  .chair.ending .time, .chair.ending .word { color: var(--ending-ink); }
   .chair.up { background: var(--up); color: var(--up-ink); animation: lit .9s ease-in-out infinite alternate; }
-  .chair.up .word, .chair.up .sub, .chair.up .count { color: #ffd0cb; }
-  @keyframes lit { from { filter: brightness(1); } to { filter: brightness(1.35); } }
-  .chair.seen { background: var(--seen); color: var(--seen-ink); border-color: #9a2e27; }
-  .chair.seen .word, .chair.seen .sub { color: #d98a82; }
-  .chair.confirm { border-color: var(--ink); }
-  .chair.picked { border-color: var(--pick); background: #1c2c40; }
-  body.layout .chair { border-style: dashed; border-color: #3b4a60; }
+  .chair.up .word, .chair.up .sub, .chair.up .count { color: rgba(255,255,255,.85); }
+  @keyframes lit { from { filter: brightness(1); } to { filter: brightness(1.25); } }
+  .chair.seen { box-shadow: inset 0 0 0 6px var(--up); }
+  .chair.seen .word { color: var(--up); }
+  .chair.confirm { box-shadow: inset 0 0 0 4px var(--ink); }
+  .chair.picked { box-shadow: inset 0 0 0 5px var(--pick), 0 0 0 2px var(--ink); }
+  body.layout .chair { outline: 2px dashed rgba(29,39,51,.4); outline-offset: -8px; }
 
   footer { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 6px 14px 12px; font-size: 13px; color: var(--dim); }
   footer .hint { flex: 1; min-width: 0; }
-  footer .tally { font-variant-numeric: tabular-nums; cursor: pointer; }
+  footer .tally { font-variant-numeric: tabular-nums; cursor: pointer; font-weight: 600; }
   @media (max-width: 480px) { footer .hint { display: none; } footer .tally { margin-left: auto; } }
   @media (prefers-reduced-motion: reduce) { body.flash, .chair.up { animation: none; } body.flash { background: var(--flash); } }
 
@@ -90,7 +91,7 @@
     justify-content: center; gap: 18px; padding: 24px; text-align: center; z-index: 5;
   }
   .sheet.show { display: flex; }
-  .sheet .qr { width: min(70vh, 80vw); max-width: 520px; }
+  .sheet .qr { width: min(70vh, 80vw); max-width: 520px; background: #fff; border-radius: 12px; }
   .sheet .qr svg { width: 100%; height: auto; display: block; }
   .sheet .url { font-size: 15px; color: var(--dim); word-break: break-all; max-width: 520px; }
   .sheet h1 { font-size: 22px; margin: 0; }
@@ -144,6 +145,8 @@
     up:      "tap the box · go tap the guest",
     seen:    "reseat · tap to start the next guest",
   };
+  // each chair's own colour, in chair-number order (Johno's palette, 2026-10-14)
+  const CHAIR_COLOURS = ["#f4bcbb", "#d4fccb", "#9acefb", "#5d9cf8", "#fbe596", "#e78ff9"];
   const WORD = { waiting: "free", running: "running", ending: "ending", up: "time's up", seen: "seen" };
 
   const room = decodeURIComponent(location.hash.slice(1)).replace(/[^A-Za-z0-9_-]/g, "");
@@ -170,6 +173,7 @@
   for (let i = 1; i <= 6; i++) {
     const el = document.createElement("div");
     el.className = "chair waiting";
+    el.style.setProperty("--c", CHAIR_COLOURS[i - 1]);
     el.innerHTML = '<div class="num">' + i + '</div><div class="word"></div><div class="time"></div><div class="sub"></div><div class="count"></div><div class="prompt"></div>';
     el.addEventListener("click", () => onTap(i));
     boxes[i] = el; grid.appendChild(el);
@@ -287,8 +291,7 @@
     const box = document.getElementById("qrBox");
     if (window.qrcode) {
       const q = qrcode(0, "M"); q.addData(url); q.make();
-      box.innerHTML = q.createSvgTag({ cellSize: 8, margin: 4, scalable: true })
-        .replace(/fill="black"/g, 'fill="#f2f0ea"').replace(/fill="white"/g, 'fill="#0b0d10"');
+      box.innerHTML = q.createSvgTag({ cellSize: 8, margin: 4, scalable: true });
     } else box.textContent = "(QR needs internet)";
     document.getElementById("qrSheet").classList.add("show");
   });
