@@ -76,26 +76,27 @@
   .chair.up { background: var(--up); color: var(--up-ink); animation: lit .9s ease-in-out infinite alternate; }
   .chair.up .word, .chair.up .sub, .chair.up .count { color: rgba(255,255,255,.85); }
   @keyframes lit { from { filter: brightness(1); } to { filter: brightness(1.25); } }
-  /* seen = gold border; a band of the same gold is added on top of the border only (not the box), sweeping across.
-     Timing in frames at 60 fps (Johno, 2026-10-15): sweep 111, hold 22, wait 4, sweep 22, hold 22, loop (181 = 3.017 s) */
+  /* seen = gold border; a band of the same gold is added on top of the border only (not the box),
+     sweeping from bottom-left to top-right. Johno, 2026-10-15: one sweep of 111 frames at 60 fps (1.85 s), gone, loop */
   .chair.seen { box-shadow: inset 0 0 0 6px var(--seen); }
-  .chair.seen .word { color: var(--seen-word); padding: 0 6px; font-size: max(11px, min(10cqw, 5cqh)); }
+  .chair.seen .word { color: var(--seen-word); padding: 0 6px; font-size: max(11px, min(10cqw, 5cqh)); white-space: pre-line; }
+  /* short boxes (phone on its side): the five seen lines need the room */
+  @container (max-height: 220px) {
+    .chair.seen .word { font-size: 9.5cqh; line-height: 1; }
+    .chair.seen .num { font-size: 25cqh; }
+  }
   .chair.seen::after {
     content: ""; position: absolute; inset: 0; padding: 6px; border-radius: inherit; pointer-events: none;
-    background: linear-gradient(110deg, transparent 40%, var(--seen) 50%, transparent 60%) no-repeat;
-    background-size: 300% 100%; background-position: 100% 0;
+    background: linear-gradient(to top right, transparent 44%, var(--seen) 50%, transparent 56%) no-repeat;
+    background-size: 300% 300%; background-position: 100% 0%;
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite: xor; mask-composite: exclude;
     mix-blend-mode: plus-lighter;
-    animation: shine 3.017s infinite;
+    animation: shine 1.85s ease-in-out infinite;
   }
   @keyframes shine {
-    0%      { background-position: 100% 0; animation-timing-function: ease-in-out; }
-    61.33%  { background-position: 0% 0; }
-    61.34%  { background-position: 100% 0; }
-    75.69%  { background-position: 100% 0; animation-timing-function: ease-in-out; }
-    87.85%  { background-position: 0% 0; }
-    100%    { background-position: 0% 0; }
+    from { background-position: 100% 0%; }
+    to   { background-position: 0% 100%; }
   }
   .chair.confirm { box-shadow: inset 0 0 0 4px var(--ink); }
   /* Layout: tap the spots in order 1..6; each tapped spot shows the chair number it will get */
@@ -178,7 +179,7 @@
   };
   // each chair's own colour, in chair-number order (Johno's palette, 2026-10-14)
   const CHAIR_COLOURS = ["#f4bcbb", "#d4fccb", "#9acefb", "#5d9cf8", "#fbe596", "#e78ff9"];
-  const WORD = { waiting: "free", running: "running", ending: "ending", up: "time's up", seen: "seen - next guest seated chair on vr play ready" };
+  const WORD = { waiting: "free", running: "running", ending: "ending", up: "time's up", seen: "seen - next\nguest seated\nchair on\nvr play\nstart timer" };
 
   const room = decodeURIComponent(location.hash.slice(1)).replace(/[^A-Za-z0-9_-]/g, "");
   if (!room) {
