@@ -81,8 +81,8 @@
   .chair.seen { box-shadow: inset 0 0 0 6px var(--seen); }
   .chair.seen .word { color: var(--seen-word); padding: 0 6px; font-size: max(11px, min(10cqw, 5cqh)); white-space: pre-line; }
   /* short boxes (phone on its side): the five seen lines need the room */
-  @container (max-height: 220px) {
-    .chair.seen .word { font-size: 9.5cqh; line-height: 1; }
+  @container (max-height: 220px) and (min-width: 221px) {
+    .chair.seen .word { font-size: min(9.5cqh, 10cqw); line-height: 1; }
     .chair.seen .num { font-size: 25cqh; }
   }
   .chair.seen::after {
