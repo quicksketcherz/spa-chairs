@@ -127,6 +127,7 @@
   .sheet .url { font-size: 15px; color: var(--dim); word-break: break-all; max-width: 520px; }
   .sheet h1 { font-size: 22px; margin: 0; }
   .sheet p { color: var(--dim); margin: 0; max-width: 420px; line-height: 1.4; }
+  .sheet button[hidden] { display: none; }
   .sheet .summary {
     white-space: pre-wrap; text-align: left; font-variant-numeric: tabular-nums; line-height: 1.5;
     background: rgba(255,255,255,.55); border-radius: 12px; padding: 14px 18px; width: 100%; max-width: 420px;
@@ -167,8 +168,10 @@
   <h1 id="dayTitle">Today</h1>
   <div class="summary" id="daySummary"></div>
   <p id="dayNote"></p>
-  <button id="dayEmail">Email so far</button>
-  <button id="dayEnd" class="end">End day · email, then clear</button>
+  <button id="dayText">Text so far</button>
+  <button id="dayEnd" class="end">End day · text, then clear</button>
+  <button id="dayClear" class="end" hidden>Clear now · start a new day</button>
+  <a id="smsLink" hidden></a>
   <button id="dayClose">← back to the chairs</button>
 </div>
 
@@ -335,40 +338,33 @@
     }
     return lines.join("\n");
   }
-  function dayCsv(list) {
-    const rows = [["date", "chair", "start", "end", "minutes", "stopped early", "seen at"]];
-    for (const e of list) rows.push([dateOf(e.start), e.chair, hms(e.start), hms(endOf(e)), e.minutes, e.stoppedAt ? "yes" : "", hms(e.seenAt)]);
-    return rows.map(r => r.join(",")).join("\n") + "\n";
-  }
-  // iPhone: the share sheet, pick Mail (the CSV goes as an attachment). Elsewhere: a mailto with the CSV in the body.
-  async function emailDay(list) {
-    const date = dateOf(list.length ? list[0].start : now());
-    const title = "Spa chairs " + date, text = title + "\n\n" + daySummary(list);
-    const file = new File([dayCsv(list)], "spa-chairs-" + date + ".csv", { type: "text/csv" });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      try { await navigator.share({ files: [file], title, text }); return true; }
-      catch (e) { if (e.name === "AbortError") return false; }
-    }
-    location.href = "mailto:?subject=" + encodeURIComponent(title) + "&body=" + encodeURIComponent(text + "\n\n" + dayCsv(list));
-    return confirm("Did the email go?");
+  // opens Messages with the summary typed in; staff pick who to send it to
+  function textDay(list) {
+    const link = document.getElementById("smsLink");
+    link.href = "sms:?&body=" + encodeURIComponent("Spa chairs " + dateOf(now()) + "\n\n" + daySummary(list));
+    link.click();
   }
   const setDayNote = t => { document.getElementById("dayNote").textContent = t; };
   function openDay() {
     const list = dayEntries();
     document.getElementById("dayTitle").textContent = "Today · " + dateOf(now());
     document.getElementById("daySummary").textContent = daySummary(list);
-    setDayNote("");
+    setDayNote(""); document.getElementById("dayClear").hidden = true;
     document.getElementById("daySheet").classList.add("show");
   }
   const closeDay = () => document.getElementById("daySheet").classList.remove("show");
-  async function endDay() {
-    if (!confirm("End the day? It emails the day, then clears every chair and the counts on all phones.")) return;
-    const list = dayEntries();
-    if (!(await emailDay(list))) { setDayNote("Not ended: the email wasn't sent."); return; }
-    const t = now();
+  // End day, step 1: text the day. Step 2 (Clear now): keep a copy in Firebase, then free every chair and zero the counts.
+  function endDay() {
+    if (!confirm("End the day? It opens Messages with the day's summary. After you send it, tap Clear now.")) return;
+    textDay(dayEntries());
+    setDayNote("Send the text, then come back and tap Clear now.");
+    document.getElementById("dayClear").hidden = false;
+  }
+  async function clearDay() {
+    const list = dayEntries(), t = now();
     const r = await fetch(DB + "/rooms/" + room + "-archive/" + dateOf(t) + "_" + hhmm(t).replace(":", "") + ".json",
       { method: "PUT", body: JSON.stringify({ log: tree.log || {}, summary: daySummary(list) }) }).catch(() => null);
-    if (!r || !r.ok) { setDayNote("Emailed, but the backup copy didn't save, so nothing was cleared. Try End day again."); return; }
+    if (!r || !r.ok) { setDayNote("The backup copy didn't save, so nothing was cleared. Check the internet and tap Clear now again."); return; }
     setAt("/log", null); put("log", null);
     for (const id in chairs) saveChair({ ...chairs[id], state: "waiting", endAt: 0, since: t, count: 0, logId: "" });
     closeDay(); render();
@@ -440,10 +436,9 @@
   document.getElementById("tally").addEventListener("click", openDay);
   document.getElementById("day").addEventListener("click", openDay);
   document.getElementById("dayClose").addEventListener("click", closeDay);
-  document.getElementById("dayEmail").addEventListener("click", async () => {
-    setDayNote((await emailDay(dayEntries())) ? "Sent. Nothing was cleared." : "Not sent.");
-  });
+  document.getElementById("dayText").addEventListener("click", () => textDay(dayEntries()));
   document.getElementById("dayEnd").addEventListener("click", endDay);
+  document.getElementById("dayClear").addEventListener("click", clearDay);
 
   document.addEventListener("keydown", e => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
