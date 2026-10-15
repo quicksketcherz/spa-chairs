@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b0d10">
+<title>Spa Chairs</title>
+<style>
+  :root {
+    --bg: #0b0d10; --ink: #f2f0ea; --dim: #7f8791; --line: #1f242b;
+    --waiting: #171b20; --running: #0f3a3d; --running-ink: #bff7f2;
+    --ending: #6b4a00; --ending-ink: #ffd36b;
+    --up: #b1261f; --up-ink: #ffe9e6; --seen: #4a1512; --seen-ink: #ffb3ab;
+    --flash: #4a0d0a; --live: #5fd38a; --pick: #9ecbff;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: -apple-system, "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    display: flex; flex-direction: column; overflow: hidden; user-select: none; -webkit-user-select: none;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  body.flash { animation: pulse 0.9s ease-in-out infinite alternate; }
+  @keyframes pulse { from { background: var(--bg); } to { background: var(--flash); } }
+
+  header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; flex: 0 0 auto; flex-wrap: wrap; }
+  header .title { font-weight: 600; letter-spacing: .04em; font-size: 15px; color: var(--dim); text-transform: uppercase; }
+  header .alert { font-weight: 700; font-size: 17px; color: #ff8a80; display: none; }
+  body.flash header .alert { display: block; }
+  body.flash header .title { display: none; }
+  header .sync { font-size: 12px; color: var(--dim); display: flex; align-items: center; gap: 5px; }
+  header .sync i { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); display: inline-block; }
+  header .sync.live i { background: var(--live); }
+  header .spacer { flex: 1; }
+  button {
+    font: inherit; color: var(--ink); background: var(--waiting); border: 1px solid var(--line);
+    border-radius: 10px; padding: 8px 12px; font-size: 14px; min-height: 36px; cursor: pointer;
+  }
+  button.on { background: #2a3340; border-color: #4a5a70; }
+  .minutes { display: flex; align-items: center; gap: 6px; }
+  .minutes span { min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+  main {
+    flex: 1 1 auto; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr);
+    gap: 10px; padding: 4px 12px 10px; min-height: 0;
+  }
+  .chair {
+    border-radius: 18px; background: var(--waiting); border: 2px solid transparent;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    position: relative; min-height: 0; min-width: 0; cursor: pointer; transition: background .25s, border-color .25s;
+  }
+  .chair .num { font-size: clamp(28px, 8vmin, 72px); font-weight: 700; line-height: 1; }
+  .chair .word { font-size: clamp(10px, 2vmin, 15px); letter-spacing: .12em; text-transform: uppercase; color: var(--dim); text-align: center; }
+  .chair .time { font-size: clamp(24px, 7vmin, 64px); font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.1; min-height: 1.1em; }
+  .chair .sub { font-size: clamp(10px, 2vmin, 14px); color: var(--dim); font-variant-numeric: tabular-nums; min-height: 1.2em; }
+  .chair .count { position: absolute; right: 10px; bottom: 8px; font-size: clamp(10px, 2vmin, 14px); color: var(--dim); }
+  .chair .prompt {
+    position: absolute; left: 0; right: 0; bottom: 8px; text-align: center; padding: 0 10px;
+    font-size: clamp(9px, 1.8vmin, 13px); color: var(--dim); line-height: 1.25; display: none;
+  }
+  body.prompts .chair .prompt { display: block; }
+  body.prompts .chair .count { bottom: auto; top: 8px; }
+
+  .chair.running { background: var(--running); color: var(--running-ink); }
+  .chair.running .word { color: #7fcfc8; }
+  .chair.ending { background: var(--ending); color: var(--ending-ink); }
+  .chair.ending .word, .chair.ending .sub { color: #e0b65a; }
+  .chair.up { background: var(--up); color: var(--up-ink); animation: lit .9s ease-in-out infinite alternate; }
+  .chair.up .word, .chair.up .sub, .chair.up .count { color: #ffd0cb; }
+  @keyframes lit { from { filter: brightness(1); } to { filter: brightness(1.35); } }
+  .chair.seen { background: var(--seen); color: var(--seen-ink); border-color: #9a2e27; }
+  .chair.seen .word, .chair.seen .sub { color: #d98a82; }
+  .chair.confirm { border-color: var(--ink); }
+  .chair.picked { border-color: var(--pick); background: #1c2c40; }
+  body.layout .chair { border-style: dashed; border-color: #3b4a60; }
+
+  footer { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 6px 14px 12px; font-size: 13px; color: var(--dim); }
+  footer .hint { flex: 1; min-width: 0; }
+  footer .tally { font-variant-numeric: tabular-nums; cursor: pointer; }
+  @media (max-width: 480px) { footer .hint { display: none; } footer .tally { margin-left: auto; } }
+  @media (prefers-reduced-motion: reduce) { body.flash, .chair.up { animation: none; } body.flash { background: var(--flash); } }
+
+  /* the QR sheet and the no-room screen */
+  .sheet {
+    position: fixed; inset: 0; background: var(--bg); display: none; flex-direction: column; align-items: center;
+    justify-content: center; gap: 18px; padding: 24px; text-align: center; z-index: 5;
+  }
+  .sheet.show { display: flex; }
+  .sheet .qr { width: min(70vh, 80vw); max-width: 520px; }
+  .sheet .qr svg { width: 100%; height: auto; display: block; }
+  .sheet .url { font-size: 15px; color: var(--dim); word-break: break-all; max-width: 520px; }
+  .sheet h1 { font-size: 22px; margin: 0; }
+  .sheet p { color: var(--dim); margin: 0; max-width: 420px; line-height: 1.4; }
+</style>
+</head>
+<body>
+<header>
+  <div class="title">Spa chairs</div>
+  <div class="alert" id="alert">Chair is up</div>
+  <div class="sync" id="sync"><i></i><span>connecting</span></div>
+  <div class="spacer"></div>
+  <div class="minutes">
+    <button id="minus" aria-label="less time">−</button><span id="minutes">5:00</span><button id="plus" aria-label="more time">+</button>
+  </div>
+  <button id="layout">Layout</button>
+  <button id="prompts" aria-label="show what to do">?</button>
+  <button id="qr">QR</button>
+</header>
+<main id="grid"></main>
+<footer>
+  <div class="hint">tap a box to start · tap a running box twice to stop · keys 1–6 start, any other key = seen</div>
+  <div class="tally" id="tally">today 0</div>
+</footer>
+
+<div class="sheet" id="qrSheet">
+  <div class="qr" id="qrBox"></div>
+  <div class="url" id="qrUrl"></div>
+  <p>scan with the phone camera · then Share → Add to Home Screen</p>
+  <button id="qrClose">← back to the chairs</button>
+</div>
+
+<div class="sheet" id="noRoom">
+  <h1>No room in this link</h1>
+  <p>Open the spa link with the room code at the end (scan the QR on the laptop or another phone).</p>
+  <button id="newRoom">Make a new room</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script>
+(() => {
+  // Same states, words and taps as app/index.html. The shared state lives in Firebase
+  // Realtime Database under rooms/<room>, where <room> is the code after # in the link.
+  // No sign-in: anyone with the full link shares the chairs.
+  const DB = "https://spa-chairs-1a2b3-default-rtdb.firebaseio.com";
+
+  const PROMPT = {
+    waiting: "seat the guest · tap to start",
+    running: "nothing to do",
+    ending:  "get ready to tap them",
+    up:      "tap the box · go tap the guest",
+    seen:    "reseat · tap to start the next guest",
+  };
+  const WORD = { waiting: "free", running: "running", ending: "ending", up: "time's up", seen: "seen" };
+
+  const room = decodeURIComponent(location.hash.slice(1)).replace(/[^A-Za-z0-9_-]/g, "");
+  if (!room) {
+    document.getElementById("noRoom").classList.add("show");
+    document.getElementById("newRoom").addEventListener("click", () => {
+      const a = new Uint8Array(8); crypto.getRandomValues(a);
+      location.hash = "spa-" + Array.from(a, b => (b % 36).toString(36)).join("");
+      location.reload();
+    });
+    return;
+  }
+  const ROOM = DB + "/rooms/" + room;
+
+  const loadedAt = Date.now();
+  const blank = i => ({ id: i, pos: i - 1, state: "waiting", endAt: 0, since: loadedAt, count: 0 });
+  const chairs = {};
+  for (let i = 1; i <= 6; i++) chairs[i] = blank(i);
+  let settings = { minutes: 5, warnSeconds: 60 };
+  let layoutMode = false, picked = null, confirmId = null, confirmTimer = null;
+
+  const grid = document.getElementById("grid");
+  const boxes = {};
+  for (let i = 1; i <= 6; i++) {
+    const el = document.createElement("div");
+    el.className = "chair waiting";
+    el.innerHTML = '<div class="num">' + i + '</div><div class="word"></div><div class="time"></div><div class="sub"></div><div class="count"></div><div class="prompt"></div>';
+    el.addEventListener("click", () => onTap(i));
+    boxes[i] = el; grid.appendChild(el);
+  }
+
+  const fmt = ms => {
+    const s = Math.max(0, Math.ceil(ms / 1000));
+    return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+  };
+  const fmtMin = m => { const s = Math.round(m * 60); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); };
+  const now = () => Date.now();
+
+  function setSync(live, text) {
+    const el = document.getElementById("sync");
+    el.className = "sync" + (live ? " live" : "");
+    el.querySelector("span").textContent = text;
+  }
+
+  // ---- writes: one at a time per path, local copy first so the tap feels instant ----
+  const queues = {};
+  function put(path, body) {
+    const prev = queues[path] || Promise.resolve();
+    queues[path] = prev.then(() => fetch(ROOM + "/" + path + ".json", { method: "PUT", body: JSON.stringify(body) }))
+      .then(r => { if (!r.ok) setSync(false, "not saved · check rules"); })
+      .catch(() => setSync(false, "offline"));
+  }
+  function saveChair(c) { chairs[c.id] = c; put("chairs/c" + c.id, c); }
+  function saveSettings(s) { settings = s; put("settings", s); }
+
+  // ---- the same rules as server.py apply(), on the effective state ----
+  function start(c) {
+    const t = now();
+    return { ...c, state: "running", endAt: t + Math.round(settings.minutes * 60000), since: t, count: c.count + 1 };
+  }
+  function effective(c) {
+    if (c.state === "running") {
+      const left = c.endAt - now();
+      if (left <= 0) return "up";
+      if (left <= settings.warnSeconds * 1000) return "ending";
+    }
+    return c.state;
+  }
+  const upSince = c => c.state === "running" ? c.endAt : c.since;
+
+  function tapChair(id) {
+    const c = chairs[id], st = effective(c);
+    if (st === "waiting" || st === "seen") saveChair(start(c));
+    else if (st === "running" || st === "ending") saveChair({ ...c, state: "waiting", endAt: 0, since: now() });
+    else if (st === "up") saveChair({ ...c, state: "seen", since: now() });
+    render();
+  }
+  function seenAll() {
+    for (const id in chairs) if (effective(chairs[id]) === "up") saveChair({ ...chairs[id], state: "seen", since: now() });
+    render();
+  }
+  function swap(a, b) {
+    const ca = chairs[a], cb = chairs[b];
+    saveChair({ ...ca, pos: cb.pos }); saveChair({ ...cb, pos: ca.pos });
+    render();
+  }
+  function setMinutes(m) { saveSettings({ ...settings, minutes: Math.max(0.5, Math.min(60, m)) }); render(); }
+  function resetTally() { for (const id in chairs) saveChair({ ...chairs[id], count: 0 }); render(); }
+
+  function onTap(id) {
+    if (layoutMode) {
+      if (picked === null) { picked = id; render(); return; }
+      if (picked !== id) swap(picked, id);
+      picked = null; render(); return;
+    }
+    const st = effective(chairs[id]);
+    if (st === "running" || st === "ending") {
+      if (confirmId === id) { clearConfirm(); tapChair(id); }
+      else { confirmId = id; clearTimeout(confirmTimer); confirmTimer = setTimeout(clearConfirm, 2500); render(); }
+      return;
+    }
+    tapChair(id);
+  }
+  function clearConfirm() { confirmId = null; clearTimeout(confirmTimer); render(); }
+
+  let wasFlashing = false;
+  function render() {
+    let anyUp = false;
+    const list = Object.values(chairs);
+    for (const c of list) {
+      const el = boxes[c.id], st = effective(c);
+      el.style.order = c.pos;
+      el.className = "chair " + st + (confirmId === c.id ? " confirm" : "") + (picked === c.id ? " picked" : "");
+      el.querySelector(".word").textContent = confirmId === c.id ? "tap again to stop" : WORD[st];
+      el.querySelector(".time").textContent = (st === "running" || st === "ending") ? fmt(c.endAt - now()) : (st === "up" ? "0:00" : "");
+      el.querySelector(".sub").textContent = (st === "waiting" || st === "seen") ? "empty " + fmt(now() - c.since) : (st === "up" ? "up " + fmt(now() - upSince(c)) : "");
+      el.querySelector(".count").textContent = c.count ? "× " + c.count : "";
+      el.querySelector(".prompt").textContent = PROMPT[st];
+      if (st === "up") anyUp = true;
+    }
+    document.body.classList.toggle("flash", anyUp);
+    document.body.classList.toggle("layout", layoutMode);
+    document.getElementById("layout").classList.toggle("on", layoutMode);
+    const ups = list.filter(c => effective(c) === "up").sort((a, b) => a.pos - b.pos).map(c => c.id);
+    document.getElementById("alert").textContent = ups.length ? "Chair " + ups.join(" + ") + (ups.length > 1 ? " are up" : " is up") : "";
+    document.getElementById("minutes").textContent = fmtMin(settings.minutes);
+    document.getElementById("tally").textContent = "today " + list.reduce((n, c) => n + c.count, 0);
+    if (anyUp && !wasFlashing && navigator.vibrate) { try { navigator.vibrate([300, 150, 300]); } catch (e) {} }
+    wasFlashing = anyUp;
+  }
+
+  document.getElementById("minus").addEventListener("click", () => setMinutes(settings.minutes - 0.5));
+  document.getElementById("plus").addEventListener("click", () => setMinutes(settings.minutes + 0.5));
+  document.getElementById("layout").addEventListener("click", () => { layoutMode = !layoutMode; picked = null; render(); });
+  document.getElementById("prompts").addEventListener("click", () => document.body.classList.toggle("prompts"));
+
+  // QR of this exact link (room included), for the next phone to scan
+  document.getElementById("qr").addEventListener("click", () => {
+    const url = location.href;
+    document.getElementById("qrUrl").textContent = url;
+    const box = document.getElementById("qrBox");
+    if (window.qrcode) {
+      const q = qrcode(0, "M"); q.addData(url); q.make();
+      box.innerHTML = q.createSvgTag({ cellSize: 8, margin: 4, scalable: true })
+        .replace(/fill="black"/g, 'fill="#f2f0ea"').replace(/fill="white"/g, 'fill="#0b0d10"');
+    } else box.textContent = "(QR needs internet)";
+    document.getElementById("qrSheet").classList.add("show");
+  });
+  document.getElementById("qrClose").addEventListener("click", () => document.getElementById("qrSheet").classList.remove("show"));
+
+  let pressTimer = null;
+  const tally = document.getElementById("tally");
+  const startPress = () => { pressTimer = setTimeout(() => { if (confirm("Reset today's tally to 0?")) resetTally(); }, 900); };
+  const endPress = () => clearTimeout(pressTimer);
+  tally.addEventListener("touchstart", startPress, { passive: true }); tally.addEventListener("mousedown", startPress);
+  tally.addEventListener("touchend", endPress); tally.addEventListener("mouseup", endPress); tally.addEventListener("mouseleave", endPress);
+
+  document.addEventListener("keydown", e => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === "Escape") { layoutMode = false; picked = null; clearConfirm(); document.getElementById("qrSheet").classList.remove("show"); return; }
+    if (/^[1-6]$/.test(e.key)) { onTap(Number(e.key)); return; }
+    if (Object.values(chairs).some(c => effective(c) === "up")) seenAll();
+  });
+
+  // ---- live sync: Firebase streams the room as server-sent events ----
+  let tree = {};
+  function setAt(path, data, merge) {
+    const keys = path.split("/").filter(Boolean);
+    if (!keys.length) { tree = merge ? { ...tree, ...data } : (data || {}); return; }
+    let node = tree;
+    for (const k of keys.slice(0, -1)) { if (typeof node[k] !== "object" || node[k] === null) node[k] = {}; node = node[k]; }
+    const last = keys[keys.length - 1];
+    if (merge) node[last] = { ...(node[last] || {}), ...data };
+    else if (data === null) delete node[last];
+    else node[last] = data;
+  }
+  function takeTree() {
+    const cs = tree.chairs || {};
+    for (let i = 1; i <= 6; i++) {
+      const b = cs["c" + i];
+      chairs[i] = b ? { id: i, pos: Number(b.pos ?? i - 1), state: String(b.state || "waiting"),
+        endAt: Number(b.endAt || 0), since: Number(b.since || loadedAt), count: Number(b.count || 0) } : blank(i);
+    }
+    const s = tree.settings || {};
+    settings = { minutes: Number(s.minutes || 5), warnSeconds: Number(s.warnSeconds || 60) };
+    render();
+  }
+
+  let es = null;
+  function connect() {
+    if (es) es.close();
+    setSync(false, "connecting");
+    es = new EventSource(ROOM + ".json");
+    const onData = merge => e => {
+      try { const m = JSON.parse(e.data); setAt(m.path, m.data, merge); takeTree(); setSync(true, "live"); } catch (err) {}
+    };
+    es.addEventListener("put", onData(false));
+    es.addEventListener("patch", onData(true));
+    es.addEventListener("cancel", () => { setSync(false, "blocked · check rules"); es.close(); });
+    es.onerror = () => setSync(false, "reconnecting");
+  }
+  // iPhones pause pages in the background; reconnect when the page comes back
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && (!es || es.readyState === 2)) connect();
+  });
+
+  render();
+  setInterval(render, 200);
+  connect();
+})();
+</script>
+</body>
+</html>
