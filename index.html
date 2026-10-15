@@ -127,6 +127,12 @@
   .sheet .url { font-size: 15px; color: var(--dim); word-break: break-all; max-width: 520px; }
   .sheet h1 { font-size: 22px; margin: 0; }
   .sheet p { color: var(--dim); margin: 0; max-width: 420px; line-height: 1.4; }
+  .sheet .summary {
+    white-space: pre-wrap; text-align: left; font-variant-numeric: tabular-nums; line-height: 1.5;
+    background: rgba(255,255,255,.55); border-radius: 12px; padding: 14px 18px; width: 100%; max-width: 420px;
+    max-height: 50vh; overflow: auto;
+  }
+  .sheet button.end { background: var(--ink); color: #fff; border-color: var(--ink); }
 </style>
 </head>
 <body>
@@ -142,6 +148,7 @@
   <button id="layout">Layout</button>
   <button id="prompts" aria-label="show what to do">?</button>
   <button id="qr">QR</button>
+  <button id="day">Day</button>
 </header>
 <main id="grid"></main>
 <footer>
@@ -154,6 +161,15 @@
   <div class="url" id="qrUrl"></div>
   <p>scan with the phone camera · then Share → Add to Home Screen</p>
   <button id="qrClose">← back to the chairs</button>
+</div>
+
+<div class="sheet" id="daySheet">
+  <h1 id="dayTitle">Today</h1>
+  <div class="summary" id="daySummary"></div>
+  <p id="dayNote"></p>
+  <button id="dayEmail">Email so far</button>
+  <button id="dayEnd" class="end">End day · email, then clear</button>
+  <button id="dayClose">← back to the chairs</button>
 </div>
 
 <div class="sheet" id="noRoom">
@@ -238,7 +254,7 @@
   // ---- the same rules as server.py apply(), on the effective state ----
   function start(c) {
     const t = now();
-    return { ...c, state: "running", endAt: t + Math.round(settings.minutes * 60000), since: t, count: c.count + 1 };
+    return { ...c, state: "running", endAt: t + Math.round(settings.minutes * 60000), since: t, count: c.count + 1, logId: t + "-c" + c.id };
   }
   function effective(c) {
     if (c.state === "running") {
@@ -252,13 +268,23 @@
 
   function tapChair(id) {
     const c = chairs[id], st = effective(c);
-    if (st === "waiting" || st === "seen") saveChair(start(c));
-    else if (st === "running" || st === "ending") saveChair({ ...c, state: "waiting", endAt: 0, since: now() });
-    else if (st === "up") saveChair({ ...c, state: "seen", since: now() });
+    if (st === "waiting" || st === "seen") {
+      const n = start(c); saveChair(n);
+      logSet(n.logId, { chair: c.id, start: n.since, minutes: settings.minutes });
+    } else if (st === "running" || st === "ending") {
+      if (c.logId) logSet(c.logId + "/stoppedAt", now());
+      saveChair({ ...c, state: "waiting", endAt: 0, since: now() });
+    } else if (st === "up") {
+      if (c.logId) logSet(c.logId + "/seenAt", now());
+      saveChair({ ...c, state: "seen", since: now() });
+    }
     render();
   }
   function seenAll() {
-    for (const id in chairs) if (effective(chairs[id]) === "up") saveChair({ ...chairs[id], state: "seen", since: now() });
+    for (const id in chairs) if (effective(chairs[id]) === "up") {
+      if (chairs[id].logId) logSet(chairs[id].logId + "/seenAt", now());
+      saveChair({ ...chairs[id], state: "seen", since: now() });
+    }
     render();
   }
   // Layout: order[n-1] = the spot (pos) chair n goes to, in the order the spots were tapped
@@ -273,7 +299,80 @@
     render();
   }
   function setMinutes(m) { saveSettings({ ...settings, minutes: Math.max(0.5, Math.min(60, m)) }); render(); }
-  function resetTally() { for (const id in chairs) saveChair({ ...chairs[id], count: 0 }); render(); }
+
+  // ---- day log: one entry per guest under rooms/<room>/log (start, stopped early, seen).
+  // End day emails it, keeps a copy under rooms/<room>-archive/<date_time>, then clears the log and the chairs.
+  function logSet(path, val) { setAt("/log/" + path, val); put("log/" + path, val); }
+  const pad = n => String(n).padStart(2, "0");
+  const hhmm = t => { const d = new Date(t); return pad(d.getHours()) + ":" + pad(d.getMinutes()); };
+  const hms = t => { if (!t) return ""; const d = new Date(t); return hhmm(t) + ":" + pad(d.getSeconds()); };
+  const dateOf = t => { const d = new Date(t); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
+  // a guest's end: when staff stopped it early, else when the time ran out
+  const endOf = e => e.stoppedAt || e.start + e.minutes * 60000;
+  const dayEntries = () => Object.values(tree.log || {}).filter(e => e && e.start).sort((a, b) => a.start - b.start);
+
+  function daySummary(list) {
+    if (!list.length) return "No guests logged yet.";
+    const lines = ["Guests: " + list.length];
+    const per = [1, 2, 3, 4, 5, 6].map(i => list.filter(e => Number(e.chair) === i).length);
+    lines.push("Per chair:");
+    per.forEach((n, i) => lines.push("  chair " + (i + 1) + "   " + n));
+    lines.push("First " + hhmm(list[0].start) + " · last " + hhmm(list[list.length - 1].start));
+    const hours = {};
+    for (const e of list) { const h = new Date(e.start).getHours(); hours[h] = (hours[h] || 0) + 1; }
+    lines.push("Per hour:");
+    for (const h of Object.keys(hours).map(Number).sort((a, b) => a - b)) lines.push("  " + pad(h) + ":00   " + hours[h]);
+    const stopped = list.filter(e => e.stoppedAt).length;
+    if (stopped) lines.push("Stopped early: " + stopped);
+    const waits = list.filter(e => e.seenAt).map(e => e.seenAt - (e.start + e.minutes * 60000)).filter(w => w >= 0);
+    if (waits.length) lines.push("Time's up → seen, average " + fmt(waits.reduce((a, b) => a + b, 0) / waits.length));
+    for (let i = 1; i <= 6; i++) {
+      const mine = list.filter(e => Number(e.chair) === i);
+      if (!mine.length) continue;
+      lines.push("", "Chair " + i);
+      for (const e of mine) lines.push("  " + hhmm(e.start) + " – " + hhmm(endOf(e)) +
+        (e.stoppedAt ? "  stopped early" : endOf(e) > now() ? "  running" : e.seenAt ? "  seen " + hhmm(e.seenAt) : ""));
+    }
+    return lines.join("\n");
+  }
+  function dayCsv(list) {
+    const rows = [["date", "chair", "start", "end", "minutes", "stopped early", "seen at"]];
+    for (const e of list) rows.push([dateOf(e.start), e.chair, hms(e.start), hms(endOf(e)), e.minutes, e.stoppedAt ? "yes" : "", hms(e.seenAt)]);
+    return rows.map(r => r.join(",")).join("\n") + "\n";
+  }
+  // iPhone: the share sheet, pick Mail (the CSV goes as an attachment). Elsewhere: a mailto with the CSV in the body.
+  async function emailDay(list) {
+    const date = dateOf(list.length ? list[0].start : now());
+    const title = "Spa chairs " + date, text = title + "\n\n" + daySummary(list);
+    const file = new File([dayCsv(list)], "spa-chairs-" + date + ".csv", { type: "text/csv" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title, text }); return true; }
+      catch (e) { if (e.name === "AbortError") return false; }
+    }
+    location.href = "mailto:?subject=" + encodeURIComponent(title) + "&body=" + encodeURIComponent(text + "\n\n" + dayCsv(list));
+    return confirm("Did the email go?");
+  }
+  const setDayNote = t => { document.getElementById("dayNote").textContent = t; };
+  function openDay() {
+    const list = dayEntries();
+    document.getElementById("dayTitle").textContent = "Today · " + dateOf(now());
+    document.getElementById("daySummary").textContent = daySummary(list);
+    setDayNote("");
+    document.getElementById("daySheet").classList.add("show");
+  }
+  const closeDay = () => document.getElementById("daySheet").classList.remove("show");
+  async function endDay() {
+    if (!confirm("End the day? It emails the day, then clears every chair and the counts on all phones.")) return;
+    const list = dayEntries();
+    if (!(await emailDay(list))) { setDayNote("Not ended: the email wasn't sent."); return; }
+    const t = now();
+    const r = await fetch(DB + "/rooms/" + room + "-archive/" + dateOf(t) + "_" + hhmm(t).replace(":", "") + ".json",
+      { method: "PUT", body: JSON.stringify({ log: tree.log || {}, summary: daySummary(list) }) }).catch(() => null);
+    if (!r || !r.ok) { setDayNote("Emailed, but the backup copy didn't save, so nothing was cleared. Try End day again."); return; }
+    setAt("/log", null); put("log", null);
+    for (const id in chairs) saveChair({ ...chairs[id], state: "waiting", endAt: 0, since: t, count: 0, logId: "" });
+    closeDay(); render();
+  }
 
   function onTap(id) {
     if (layoutMode) {
@@ -338,16 +437,17 @@
   });
   document.getElementById("qrClose").addEventListener("click", () => document.getElementById("qrSheet").classList.remove("show"));
 
-  let pressTimer = null;
-  const tally = document.getElementById("tally");
-  const startPress = () => { pressTimer = setTimeout(() => { if (confirm("Reset today's tally to 0?")) resetTally(); }, 900); };
-  const endPress = () => clearTimeout(pressTimer);
-  tally.addEventListener("touchstart", startPress, { passive: true }); tally.addEventListener("mousedown", startPress);
-  tally.addEventListener("touchend", endPress); tally.addEventListener("mouseup", endPress); tally.addEventListener("mouseleave", endPress);
+  document.getElementById("tally").addEventListener("click", openDay);
+  document.getElementById("day").addEventListener("click", openDay);
+  document.getElementById("dayClose").addEventListener("click", closeDay);
+  document.getElementById("dayEmail").addEventListener("click", async () => {
+    setDayNote((await emailDay(dayEntries())) ? "Sent. Nothing was cleared." : "Not sent.");
+  });
+  document.getElementById("dayEnd").addEventListener("click", endDay);
 
   document.addEventListener("keydown", e => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
-    if (e.key === "Escape") { layoutMode = false; order = []; clearConfirm(); document.getElementById("qrSheet").classList.remove("show"); return; }
+    if (e.key === "Escape") { layoutMode = false; order = []; clearConfirm(); document.getElementById("qrSheet").classList.remove("show"); closeDay(); return; }
     if (/^[1-6]$/.test(e.key)) { onTap(Number(e.key)); return; }
     if (Object.values(chairs).some(c => effective(c) === "up")) seenAll();
   });
@@ -369,7 +469,7 @@
     for (let i = 1; i <= 6; i++) {
       const b = cs["c" + i];
       chairs[i] = b ? { id: i, pos: Number(b.pos ?? i - 1), state: String(b.state || "waiting"),
-        endAt: Number(b.endAt || 0), since: Number(b.since || loadedAt), count: Number(b.count || 0) } : blank(i);
+        endAt: Number(b.endAt || 0), since: Number(b.since || loadedAt), count: Number(b.count || 0), logId: String(b.logId || "") } : blank(i);
     }
     const s = tree.settings || {};
     settings = { minutes: Number(s.minutes || 5), warnSeconds: Number(s.warnSeconds || 60) };
