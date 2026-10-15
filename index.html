@@ -127,7 +127,7 @@
   .sheet .url { font-size: 15px; color: var(--dim); word-break: break-all; max-width: 520px; }
   .sheet h1 { font-size: 22px; margin: 0; }
   .sheet p { color: var(--dim); margin: 0; max-width: 420px; line-height: 1.4; }
-  .sheet button[hidden] { display: none; }
+  .sheet .ver { font-size: 11px; }
   .sheet .summary {
     white-space: pre-wrap; text-align: left; font-variant-numeric: tabular-nums; line-height: 1.5;
     background: rgba(255,255,255,.55); border-radius: 12px; padding: 14px 18px; width: 100%; max-width: 420px;
@@ -168,9 +168,9 @@
   <h1 id="dayTitle">Today</h1>
   <div class="summary" id="daySummary"></div>
   <p id="dayNote"></p>
-  <button id="dayText">Text so far</button>
-  <button id="dayEnd" class="end">End day · text, then clear</button>
-  <button id="dayClear" class="end" hidden>Clear now · start a new day</button>
+  <p class="ver">page 2026-10-15 e</p>
+  <button id="dayText">Text the day</button>
+  <button id="dayClear" class="end">Clear · start a new day</button>
   <a id="smsLink" hidden></a>
   <button id="dayClose">← back to the chairs</button>
 </div>
@@ -349,22 +349,18 @@
     const list = dayEntries();
     document.getElementById("dayTitle").textContent = "Today · " + dateOf(now());
     document.getElementById("daySummary").textContent = daySummary(list);
-    setDayNote(""); document.getElementById("dayClear").hidden = true;
+    setDayNote("");
     document.getElementById("daySheet").classList.add("show");
   }
   const closeDay = () => document.getElementById("daySheet").classList.remove("show");
-  // End day, step 1: text the day. Step 2 (Clear now): keep a copy in Firebase, then free every chair and zero the counts.
-  function endDay() {
-    if (!confirm("End the day? It opens Messages with the day's summary. After you send it, tap Clear now.")) return;
-    textDay(dayEntries());
-    setDayNote("Send the text, then come back and tap Clear now.");
-    document.getElementById("dayClear").hidden = false;
-  }
+  // Clear = keep a copy in Firebase, then free every chair and zero the counts. Its own button, so it still
+  // works when iOS reloads the page on the way back from Messages.
   async function clearDay() {
+    if (!confirm("Clear the day? Every chair goes to free and every count to 0, on all phones. A copy is kept in Firebase. Text the day first if you need it.")) return;
     const list = dayEntries(), t = now();
     const r = await fetch(DB + "/rooms/" + room + "-archive/" + dateOf(t) + "_" + hhmm(t).replace(":", "") + ".json",
       { method: "PUT", body: JSON.stringify({ log: tree.log || {}, summary: daySummary(list) }) }).catch(() => null);
-    if (!r || !r.ok) { setDayNote("The backup copy didn't save, so nothing was cleared. Check the internet and tap Clear now again."); return; }
+    if (!r || !r.ok) { setDayNote("The backup copy didn't save, so nothing was cleared. Check the internet and tap Clear again."); return; }
     setAt("/log", null); put("log", null);
     for (const id in chairs) saveChair({ ...chairs[id], state: "waiting", endAt: 0, since: t, count: 0, logId: "" });
     closeDay(); render();
@@ -437,7 +433,6 @@
   document.getElementById("day").addEventListener("click", openDay);
   document.getElementById("dayClose").addEventListener("click", closeDay);
   document.getElementById("dayText").addEventListener("click", () => textDay(dayEntries()));
-  document.getElementById("dayEnd").addEventListener("click", endDay);
   document.getElementById("dayClear").addEventListener("click", clearDay);
 
   document.addEventListener("keydown", e => {
