@@ -710,8 +710,21 @@ function moveDot(p){
     tgt.c.x = p.x; tgt.c.y = p.y; tgt.lw = {x: rest.lw.x + dx, y: rest.lw.y + dy}; tgt.rw = {x: rest.rw.x + dx, y: rest.rw.y + dy}; }
   else tgt[dragDot] = {x: p.x, y: p.y};
 }
-feed.addEventListener('pointermove', e => { if (dragDot) moveDot(feedXY(e)); });
-const letGo = () => { if (dragDot){ dragDot = null; restTargets(); } };
+feed.addEventListener('pointermove', e => { if (!dragDot) return; const p = feedXY(e), t = performance.now();
+  if (lastP && t > lastPT){ const k = Math.min(1, (t - lastPT) / 40); fingerV.x += ((p.x - lastP.x) / ((t - lastPT) / 1000) - fingerV.x) * k; fingerV.y += ((p.y - lastP.y) / ((t - lastPT) / 1000) - fingerV.y) * k; }
+  lastP = p; lastPT = t; moveDot(p); });
+/* letting go: a slow drag is posing — the body stays where you left it (that becomes the pose).
+   A quick swipe is a flick — the body springs back to the pose. The finger's speed at release tells them apart. */
+let fingerV = {x: 0, y: 0}, lastP = null, lastPT = 0;
+const letGo = () => {
+  if (!dragDot) return;
+  const fast = Math.hypot(fingerV.x, fingerV.y) > 900;          /* px per second on the wall */
+  if (!fast){
+    if (dragDot === 'c'){ rest.x = tgt.c.x; rest.y = tgt.c.y; rest.lw = {...tgt.lw}; rest.rw = {...tgt.rw}; }
+    else rest[dragDot] = {...tgt[dragDot]};
+  }
+  dragDot = null; restTargets(); fingerV = {x: 0, y: 0}; lastP = null;
+};
 feed.addEventListener('pointerup', letGo); feed.addEventListener('pointercancel', letGo); feed.addEventListener('lostpointercapture', letGo);
 window.addEventListener('pointerup', letGo); window.addEventListener('blur', letGo);
 
