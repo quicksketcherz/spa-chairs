@@ -123,6 +123,8 @@ const KNOBS = [
   ['Bars',       'Take length bars',       2,  16, 1,     8],
   ['Loops',      'Ghost loops',            2,   5, 1,     3],
   ['Trail',      'Trail length s',       0.2,   6, .1,    2],
+  ['Pulse',      'Pulse amount',         0.5,   8, .1,    3],
+  ['Micgain',    'Mic gain',               1,  12, .5,    4],
   ['Sweep',      'Sweep to play deg',     10, 150, 1,    45],
   ['Window',     'On the beat window',  0.05, 0.5, .01, .2],
   ['Swell',      'Sphere swell',           0,   1, .01, .55],
@@ -295,7 +297,7 @@ function stopMic(){ if (mic) mic.getTracks().forEach(t => t.stop()); mic = null;
 $('micbtn').addEventListener('click', () => anM ? stopMic() : startMic());
 function fromMic(dt){
   anM.getFloatTimeDomainData(bufM); let s = 0; for (const v of bufM) s += v * v;
-  const rms = Math.min(1, Math.sqrt(s / bufM.length) * 4); micLevel = rms;
+  const rms = Math.min(1, Math.sqrt(s / bufM.length) * K('Micgain')); micLevel = rms;
   avgM += (rms - avgM) * Math.min(1, dt * 4);
   if (rms - avgM > ONSET * .8 && rms > prevM){
     bandEvent('drums', Math.min(1, .5 + rms)); beatPulse = 1;
@@ -413,7 +415,7 @@ function addRipple(x, y, s){ ripples.push({x, y, age: 0, s}); if (ripples.length
 function drawLook(t, dim){
   if (!glok) return false;
   const sph = new Float32Array(112), rip = new Float32Array(48);
-  const sw = 1 + K('Swell') * swellKick * .7;
+  const sw = 1 + K('Swell') * swellKick * .7 + (anM ? K('Pulse') * .25 * micLevel : 0);
   for (let i = 0; i < 4; i++){
     const a = t * .25 + i * 1.5708, d = 40 + 7 * Math.sin(t * .7 + i);
     sph.set([ZONE.drums.x + Math.cos(a) * d * 1.1, ZONE.drums.y + Math.sin(a) * d, (36 + 7 * (i % 2)) * sw, 0], i * 4);
@@ -421,14 +423,14 @@ function drawLook(t, dim){
   wristSph.slice(-6).forEach((s, i) => sph.set([s.x, s.y, s.r * Math.max(0, s.life), 0], (4 + i) * 4));
   /* the cloud trail: an arm holding the drums leaves blobs that melt together and keep throbbing with the band (or the mic),
      a reverb tail of the arm's path. Newest blobs biggest; they shrink away over the Trail length. */
-  const L = K('Trail'), throb = 1 + .9 * env.drums + .6 * beatPulse + (anM ? micLevel * 2.2 : 0);
+  const L = K('Trail'), throb = 1 + K('Pulse') * (.4 * env.drums + .3 * beatPulse + (anM ? micLevel : 0));
   let n = 0;
   for (const A of [arms.l, arms.r]){
     const tr = A.trail;
     for (let i = tr.length - 1; i >= 0 && n < 18; i -= 5){
       const q = tr[i]; if (q.chan !== 'drums') continue;
       const age = (now - q.t) / L; if (age >= 1) break;
-      sph.set([q.x, q.y, (14 + 26 * (1 - age)) * throb, 0], (10 + n++) * 4);
+      sph.set([q.x, q.y, (10 + 22 * (1 - age)) * throb, 0], (10 + n++) * 4);
     }
   }
   ripples.forEach((r, i) => rip.set([r.x, r.y, r.age, r.s], i * 4));
@@ -680,8 +682,8 @@ function drawTrail(tr, alpha){
       if (b.chan === 'drums' && alpha >= 1) continue;      /* the live drum trail is the cloud in the shader */
       const tint = b.chan === 'none' ? [255, 255, 255] : TINT[b.chan].map(v => Math.round(v * .8 + 255 * .2));
       /* the pulse: the beat itself, plus what the band (or the mic) is doing now, strongest on the newest part of the trail */
-      const lv = (b.chan === 'none' ? .3 : env[b.chan]) + (anM ? micLevel * 2 : 0);
-      const pulse = 1 + (1.6 * beatPulse + lv) * (1 - age);
+      const lv = (b.chan === 'none' ? .3 : env[b.chan]) + (anM ? micLevel : 0);
+      const pulse = 1 + K('Pulse') * (.6 * beatPulse + lv) * (1 - age);
       const k = Math.min(1, (1 - age) * alpha * (.55 + .45 * pulse));
       cx.strokeStyle = rgba(tint, pass ? k : k * .2);
       cx.lineWidth = pass ? 3 * pulse : 12 + 12 * pulse;
