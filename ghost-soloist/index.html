@@ -142,7 +142,8 @@ const TINT = { drums: [130, 150, 255], plucks: [255, 140, 235], bass: [255, 200,
 let phase = 0;
 const mixc = (a, b, k) => a.map((v, i) => Math.round(v + (b[i] - v) * k));
 function phaseTints(){
-  TINT.drums = mixc([130, 150, 255], [190, 130, 255], .5 + .5 * Math.sin(phase));
+  const ph = ((phase / 6.2832) % 1 + 1) % 1 * 4, C = [[130,150,255],[190,130,255],[255,140,235],[255,200,120]], i = Math.floor(ph) % 4;
+  TINT.drums = mixc(C[i], C[(i + 1) % 4], ph - Math.floor(ph));
   TINT.plucks = mixc([255, 140, 235], [255, 160, 170], .5 + .5 * Math.sin(phase * 1.3 + 4));
   TINT.bass = mixc([255, 200, 120], [255, 150, 150], .5 + .5 * Math.sin(phase + 2.1));
 }
@@ -397,8 +398,12 @@ void main(){
     float t = clamp(-f / 34., 0., 1.);
     vec3 n = normalize(vec3(g * (1. - t), t * 1.4 + .05));
     float l = dot(n, normalize(vec3(-.55, -.7, .6)));
-    float k = .5 + .5 * sin(uPh);
-    vec3 coral = mix(vec3(74., 108., 255.), vec3(150., 70., 255.), k) / 255., ox = mix(vec3(34., 22., 120.), vec3(60., 18., 110.), k) / 255.;   // drums · blue ↔ violet
+    // the cloud phases through the whole stage: blue → violet → magenta → gold → blue
+    float ph = fract(uPh / 6.2832) * 4.;
+    vec3 c0 = vec3(74., 108., 255.), c1 = vec3(150., 70., 255.), c2 = vec3(255., 79., 216.), c3 = vec3(255., 178., 74.);
+    vec3 s0 = vec3(34., 22., 120.), s1 = vec3(60., 18., 110.), s2 = vec3(120., 20., 90.), s3 = vec3(120., 70., 24.);
+    vec3 coral = (ph < 1. ? mix(c0, c1, ph) : ph < 2. ? mix(c1, c2, ph - 1.) : ph < 3. ? mix(c2, c3, ph - 2.) : mix(c3, c0, ph - 3.)) / 255.;
+    vec3 ox    = (ph < 1. ? mix(s0, s1, ph) : ph < 2. ? mix(s1, s2, ph - 1.) : ph < 3. ? mix(s2, s3, ph - 2.) : mix(s3, s0, ph - 3.)) / 255.;
     vec3 tone = mix(ox, coral, smoothstep(.30, .34, l));
     col = mix(col, tone * (.22 + .78 * uDim), 1. - smoothstep(-1., 1., f));
   }
