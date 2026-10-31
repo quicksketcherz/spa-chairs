@@ -718,11 +718,9 @@ feed.addEventListener('pointermove', e => { if (!dragDot) return; const p = feed
 let fingerV = {x: 0, y: 0}, lastP = null, lastPT = 0;
 const letGo = () => {
   if (!dragDot) return;
-  const fast = Math.hypot(fingerV.x, fingerV.y) > 900;          /* px per second on the wall */
-  if (!fast){
-    if (dragDot === 'c'){ rest.x = tgt.c.x; rest.y = tgt.c.y; rest.lw = {...tgt.lw}; rest.rw = {...tgt.rw}; }
-    else rest[dragDot] = {...tgt[dragDot]};
-  }
+  /* wherever you let go is the pose: the body settles there and stays (Johno, 2026-10-30: "let me pose and it will stay") */
+  if (dragDot === 'c'){ rest.x = tgt.c.x; rest.y = tgt.c.y; rest.lw = {...tgt.lw}; rest.rw = {...tgt.rw}; }
+  else rest[dragDot] = {...tgt[dragDot]};
   dragDot = null; restTargets(); fingerV = {x: 0, y: 0}; lastP = null;
 };
 feed.addEventListener('pointerup', letGo); feed.addEventListener('pointercancel', letGo); feed.addEventListener('lostpointercapture', letGo);
