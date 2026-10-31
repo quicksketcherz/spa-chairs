@@ -711,8 +711,9 @@ function moveDot(p){
   else tgt[dragDot] = {x: p.x, y: p.y};
 }
 feed.addEventListener('pointermove', e => { if (dragDot) moveDot(feedXY(e)); });
-feed.addEventListener('pointerup', () => { dragDot = null; restTargets(); });
-feed.addEventListener('pointercancel', () => { dragDot = null; restTargets(); });
+const letGo = () => { if (dragDot){ dragDot = null; restTargets(); } };
+feed.addEventListener('pointerup', letGo); feed.addEventListener('pointercancel', letGo); feed.addEventListener('lostpointercapture', letGo);
+window.addEventListener('pointerup', letGo); window.addEventListener('blur', letGo);
 
 /* ================================================================ the 2D layers over the shader */
 const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
