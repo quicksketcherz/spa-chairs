@@ -297,7 +297,12 @@ function fromMic(dt){
   anM.getFloatTimeDomainData(bufM); let s = 0; for (const v of bufM) s += v * v;
   const rms = Math.min(1, Math.sqrt(s / bufM.length) * 4); micLevel = rms;
   avgM += (rms - avgM) * Math.min(1, dt * 4);
-  if (rms - avgM > ONSET * .8 && rms > prevM) bandEvent('drums', Math.min(1, .5 + rms));
+  if (rms - avgM > ONSET * .8 && rms > prevM){
+    bandEvent('drums', Math.min(1, .5 + rms)); beatPulse = 1;
+    /* a hit near a beat pulls the clock onto it, so the picture's beat follows the room, not just Tempo */
+    const nb = Math.round(beat), off = nb - beat;
+    if (Math.abs(off) < .3){ beat += off * .5; lastBeat = beat; }
+  }
   prevM = rms; env.drums = Math.max(env.drums * Math.exp(-dt * 8), rms * .5);
   anM.getFloatFrequencyData(bufMf); const hz = actx.sampleRate / 2 / bufMf.length;
   let lo = 0, nl = 0, hi = 0, nh = 0;
@@ -402,7 +407,7 @@ let glok = false, U = {};
   for (const n of ['uRes','uDim','uBass','uBassFlare','uBassX','uSmooth','uSph','uRip']) U[n] = gl.getUniformLocation(pr, n);
   gl.viewport(0, 0, W, H); glok = true;
 })();
-let swellKick = 0, bassFlare = 0, bassX = .5;
+let swellKick = 0, bassFlare = 0, bassX = .5, beatPulse = 0;
 const ripples = [], wristSph = [];
 function addRipple(x, y, s){ ripples.push({x, y, age: 0, s}); if (ripples.length > 12) ripples.shift(); }
 function drawLook(t, dim){
@@ -660,11 +665,13 @@ function drawTrail(tr, alpha){
   for (let pass = 0; pass < 2; pass++){
     for (let i = 1; i < tr.length; i++){
       const a = tr[i - 1], b = tr[i], age = (now - b.t) / L;
-      const tint = b.chan === 'none' ? [255, 255, 255] : TINT[b.chan].map(v => Math.round(v * .55 + 255 * .45));
-      const lv = b.chan === 'none' ? .3 : env[b.chan];
-      const k = (1 - age) * alpha;
-      cx.strokeStyle = rgba(tint, pass ? k : k * .18);
-      cx.lineWidth = pass ? 3 + 6 * lv * (1 - age) : 14 + 16 * lv * (1 - age);
+      const tint = b.chan === 'none' ? [255, 255, 255] : TINT[b.chan].map(v => Math.round(v * .8 + 255 * .2));
+      /* the pulse: the beat itself, plus what the band (or the mic) is doing now, strongest on the newest part of the trail */
+      const lv = (b.chan === 'none' ? .3 : env[b.chan]) + (anM ? micLevel * 2 : 0);
+      const pulse = 1 + (1.6 * beatPulse + lv) * (1 - age);
+      const k = Math.min(1, (1 - age) * alpha * (.55 + .45 * pulse));
+      cx.strokeStyle = rgba(tint, pass ? k : k * .2);
+      cx.lineWidth = pass ? 3 * pulse : 12 + 12 * pulse;
       cx.beginPath(); cx.moveTo(a.x, a.y); cx.lineTo(b.x, b.y); cx.stroke();
     }
   }
@@ -712,6 +719,8 @@ function step(ts){
     if (cur === 2 || cur === 3){ lastGhostB = ghostBeat; ghostBeat += dt * K('Tempo') / 60; }
   }
   const dtF = paused ? 0 : dt;
+  if (Math.floor(beat) !== Math.floor(lastBeat)) beatPulse = 1;      /* every beat: a pulse the trails and spheres ride */
+  beatPulse *= Math.exp(-dtF * 6);
   if (anM) fromMic(dt); else if (anD || anO) fromStems(dtF); else if (dtF) standIn(dtF);
   drawMeter(dt);
   for (const k in env) if (k !== 'bass') env[k] *= Math.exp(-dtF * 7);
