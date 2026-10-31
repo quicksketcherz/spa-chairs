@@ -12,7 +12,7 @@
 <style>
 /* layout: the wall fills the phone; two thin bands of words over it, top and bottom */
 :root{
-  --bg:#120A0C; --fg:#F1EAF0; --muted:#A08F9A; --accent:#FFA028; --good:#B8F15A; --lilac:#E6D9FF; --panel:rgba(18,10,12,.72);
+  --bg:#0B0716; --fg:#F1EAF0; --muted:#A08F9A; --accent:#FFA028; --good:#FF4FD8; --lilac:#E6D9FF; --panel:rgba(18,10,12,.72);
   --font:system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif; color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -81,14 +81,14 @@ body.clean .band > :not(#state):not(#prompt):not(.keep){display:none}
     <div id="meter" class="keep">
       <span class="lab" id="mlab">no sound</span>
       <canvas id="vu" width="300" height="28"></canvas>
-      <div id="chan" title="drums · plucks · bass"><i style="--c:#FF5A4E"></i><i style="--c:#B8F15A"></i><i style="--c:#9b6bd6"></i></div>
+      <div id="chan" title="drums · plucks · bass"><i style="--c:#4A6CFF"></i><i style="--c:#FF4FD8"></i><i style="--c:#FFB24A"></i></div>
     </div>
     <div id="tune">
       <div id="sliders"></div>
       <div class="pads">
-        <button data-pad="drums"><span class="sw" style="background:#FF5A4E"></span>Drum</button>
-        <button data-pad="plucks"><span class="sw" style="background:#B8F15A"></span>Pluck</button>
-        <button data-pad="bass"><span class="sw" style="background:#7a4bb0"></span>Bass</button>
+        <button data-pad="drums"><span class="sw" style="background:#4A6CFF"></span>Drum</button>
+        <button data-pad="plucks"><span class="sw" style="background:#FF4FD8"></span>Pluck</button>
+        <button data-pad="bass"><span class="sw" style="background:#FFB24A"></span>Bass</button>
         <button id="tap">Tap tempo</button>
         <button id="stems">Load stems…</button>
         <input id="stemfiles" type="file" accept="audio/*" multiple hidden>
@@ -136,7 +136,7 @@ const KNOBS = [
   ['Edge',       'Cutout edge softness', 0.05, 0.6, .01, .2]
 ];
 const W = 720, H = 1280;                 /* the 9 × 16 wall */
-const TINT = { drums: [255, 150, 140], plucks: [215, 248, 160], bass: [190, 160, 235], none: [255, 255, 255] };
+const TINT = { drums: [130, 150, 255], plucks: [255, 140, 235], bass: [255, 200, 120], none: [255, 255, 255] };
 /* where the channels sit on the wall (px): drums top left, plucks top right, bass along the bottom */
 const ZONE = { drums: {x: W * .3, y: H * .3, r: 110}, plucks: {x: W * .7, y: H * .3, r: 110}, bassY: H * .78 };
 const S = 1.35;                           /* the stand-in skeleton, bigger for the tall wall */
@@ -327,7 +327,7 @@ function drawMeter(dt){
   vux.clearRect(0, 0, w, h);
   vuh.forEach((v, i) => {
     const bh = Math.max(3, v * h), x = i * bw + bw * .25, y = (h - bh) / 2;
-    vux.fillStyle = v < .04 ? 'rgba(255,255,255,.18)' : anM ? '#B8F15A' : '#FFA028';
+    vux.fillStyle = v < .04 ? 'rgba(255,255,255,.18)' : anM ? '#FF4FD8' : '#FFA028';
     vux.beginPath(); vux.roundRect(x, y, bw * .5, bh, 2); vux.fill();
   });
   $('mlab').textContent = anM ? 'mic ' + Math.round(micLevel * 100) : (anD || anO) ? 'stems' : soundOn ? 'synth' : 'no sound';
@@ -365,13 +365,13 @@ float smin(float a, float b, float k){ float h = clamp(.5 + .5 * (b - a) / k, 0.
 float field(vec2 p){ float d = 1e5; for (int i = 0; i < 28; i++){ if (uSph[i].z <= 0.) continue; d = smin(d, length(p - uSph[i].xy) - uSph[i].z, uSmooth); } return d; }
 void main(){
   vec2 p = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);
-  vec3 col = vec3(18., 10., 12.) / 255.;
+  vec3 col = vec3(11., 7., 22.) / 255.;            // room · violet-black
   float y = p.y / uRes.y;
-  vec3 violet = vec3(59., 26., 94.) / 255.;
+  vec3 violet = vec3(120., 70., 24.) / 255.;        // bass · the gold snare, low on the wall
   float low = smoothstep(.55, 1., y);
   float flare = uBassFlare * exp(-pow((p.x / uRes.x - uBassX) * 3.5, 2.));
   col += violet * low * (1.1 * uBass + 2.4 * flare) * (.3 + .7 * uDim);
-  vec3 lime = vec3(184., 241., 90.) / 255.;
+  vec3 lime = vec3(255., 79., 216.) / 255.;         // plucks · magenta rims
   for (int i = 0; i < 12; i++){
     vec4 r = uRip[i]; if (r.w <= 0.) continue;
     float rad = 10. + r.z * 95.;
@@ -388,7 +388,7 @@ void main(){
     float t = clamp(-f / 34., 0., 1.);
     vec3 n = normalize(vec3(g * (1. - t), t * 1.4 + .05));
     float l = dot(n, normalize(vec3(-.55, -.7, .6)));
-    vec3 coral = vec3(255., 90., 78.) / 255., ox = vec3(122., 30., 42.) / 255.;
+    vec3 coral = vec3(74., 108., 255.) / 255., ox = vec3(34., 22., 120.) / 255.;   // drums · blue chrome, indigo shadow
     vec3 tone = mix(ox, coral, smoothstep(.30, .34, l));
     col = mix(col, tone * (.22 + .78 * uDim), 1. - smoothstep(-1., 1., f));
   }
@@ -586,7 +586,7 @@ function camStep(){
     if (cur === 1 && cam.n++ % 2 === 0){
       const g = document.createElement('canvas'); g.width = 144; g.height = Math.round(144 * h / w);
       const gx = g.getContext('2d'); gx.drawImage(cam.cut, 0, 0, g.width, g.height);
-      gx.globalCompositeOperation = 'source-in'; gx.fillStyle = '#E6D9FF'; gx.fillRect(0, 0, g.width, g.height);
+      gx.globalCompositeOperation = 'source-in'; gx.fillStyle = '#DCD0FF'; gx.fillRect(0, 0, g.width, g.height);
       rec.cut.push({b: clockBeats(), c: g}); rec.map = M;
     }
   }
@@ -711,7 +711,7 @@ function drawBody(sk, colr, alpha, chans, lw){
 function paint(t, show){
   const dim = cur === 0 ? K('Dim') : 1;
   if (drawLook(t, dim)) cx.drawImage(glc, 0, 0);
-  else { cx.fillStyle = '#120A0C'; cx.fillRect(0, 0, W, H); }
+  else { cx.fillStyle = '#0B0716'; cx.fillRect(0, 0, W, H); }
   if (show.gcut && rec.map) drawCut(show.gcut, rec.map, K('Ghostalpha') * ghostFade);
   if (show.cut && cam.map) drawCut(show.cut, cam.map, 1);
   cx.globalCompositeOperation = 'lighter';
