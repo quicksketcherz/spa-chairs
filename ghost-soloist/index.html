@@ -1,0 +1,774 @@
+<meta charset="utf-8">
+<title>Ghost Soloist Phone</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<!--
+  Ghost Soloist · phone version (TD-SKETCHES26, 2026-10-30). The construct's round on a 9 × 16 wall, held in one hand.
+  Front camera: you are the cutout (MediaPipe Pose Landmarker in the page), your wrists pick up and play the channels.
+  Same round as ghost-soloist-construct-2026-10-30.html: WAITING → TAKE (8 bars, recorded) → LOOPS → NEXT.
+  One file, no shell packets, no TD link: it runs as a local file, served by the Mac (localhost:8772 over Wi‑Fi), or
+  as an Artifact (where the camera may be blocked; the page says so). Look: Set 3 · Neon cellar.
+-->
+<style>
+/* layout: the wall fills the phone; two thin bands of words over it, top and bottom */
+:root{
+  --bg:#120A0C; --fg:#F1EAF0; --muted:#A08F9A; --accent:#FFA028; --good:#B8F15A; --lilac:#E6D9FF; --panel:rgba(18,10,12,.72);
+  --font:system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.4 var(--font);overflow:hidden;
+  padding-left:max(0px,env(safe-area-inset-left,0px));padding-right:max(0px,env(safe-area-inset-right,0px))}
+#stage{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--bg)}
+#feed{display:block;max-width:100%;max-height:100%;aspect-ratio:9/16;touch-action:none;background:var(--bg)}
+.band{position:absolute;left:0;right:0;display:flex;flex-direction:column;gap:6px;pointer-events:none;
+  padding:10px max(16px,env(safe-area-inset-left,0px)) 10px max(16px,env(safe-area-inset-right,0px))}
+.band > *{pointer-events:auto}
+#top{top:0;padding-top:calc(10px + env(safe-area-inset-top,0px))}
+#bottom{bottom:0;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));align-items:stretch}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+#state{font-size:30px;font-weight:700;letter-spacing:.03em;color:var(--accent);line-height:1.05;text-shadow:0 1px 8px #000}
+#prompt{font-size:16px;color:var(--fg);text-shadow:0 1px 6px #000}
+.chip{font-size:12px;padding:3px 9px;border-radius:99px;background:var(--panel);color:var(--muted);border:1px solid rgba(255,255,255,.12);
+  font-variant-numeric:tabular-nums;white-space:nowrap;backdrop-filter:blur(6px)}
+.chip.good{color:#1d1d1d;background:var(--good);border-color:var(--good)}
+.chip.hot{color:#1d1d1d;background:var(--accent);border-color:var(--accent)}
+button{font:inherit;color:var(--fg);background:var(--panel);border:1px solid rgba(255,255,255,.18);border-radius:8px;
+  padding:10px 14px;min-height:44px;cursor:pointer;backdrop-filter:blur(6px);transition:transform .06s,border-color .12s}
+button:active{transform:scale(.96)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.on{background:var(--accent);border-color:var(--accent);color:#1d1d1d}
+button.big{flex:1 1 auto;font-weight:600}
+#hint{font-size:16px;font-weight:600;color:var(--accent);min-height:22px;text-shadow:0 1px 6px #000}
+#hint.good{color:var(--good)}
+#tune{display:none;flex-direction:column;gap:4px;background:var(--panel);border:1px solid rgba(255,255,255,.12);border-radius:10px;
+  padding:10px 12px;backdrop-filter:blur(8px);max-height:46vh;overflow:auto}
+#tune.open{display:flex}
+.sl{display:grid;grid-template-columns:118px 1fr 44px;gap:8px;align-items:center}
+.sl label{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sl input[type=range]{width:100%;min-width:0;accent-color:var(--accent)}
+.rt{text-align:right;color:var(--fg);font-size:12px;font-variant-numeric:tabular-nums}
+.pads{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.pads button{min-height:36px;padding:6px 10px;font-size:13px}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}
+#toast{position:fixed;left:50%;transform:translateX(-50%);top:calc(50% - 20px);z-index:30;background:var(--fg);color:var(--bg);
+  padding:8px 14px;border-radius:99px;font-size:13px;max-width:88vw;text-align:center}
+/* the audio meter: thin rounded bars growing from the middle, new sample in at the right (the voice-meter pattern) */
+#meter{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:10px;background:var(--panel);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(6px)}
+#meter .lab{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);white-space:nowrap;min-width:52px}
+#vu{flex:1 1 auto;height:28px;display:block}
+#chan{display:flex;gap:4px}
+#chan i{display:block;width:8px;height:28px;border-radius:4px;background:rgba(255,255,255,.1);position:relative;overflow:hidden}
+#chan i::after{content:"";position:absolute;left:0;right:0;bottom:0;height:var(--lv,0%);background:var(--c);border-radius:4px}
+body.clean .band > :not(#state):not(#prompt):not(.keep){display:none}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div id="stage">
+  <canvas id="feed" width="720" height="1280"></canvas>
+  <div class="band" id="top">
+    <span id="state">—</span>
+    <span id="prompt">Waiting…</span>
+    <div class="row keep">
+      <span class="chip" id="c-hands">no body</span>
+      <span class="chip" id="c-left">—</span>
+      <span class="chip" id="c-hits">0 hits</span>
+      <span class="chip" id="c-fps">— fps</span>
+    </div>
+  </div>
+  <div class="band" id="bottom">
+    <div id="hint" class="keep">—</div>
+    <div id="meter" class="keep">
+      <span class="lab" id="mlab">no sound</span>
+      <canvas id="vu" width="300" height="28"></canvas>
+      <div id="chan" title="drums · plucks · bass"><i style="--c:#FF5A4E"></i><i style="--c:#B8F15A"></i><i style="--c:#9b6bd6"></i></div>
+    </div>
+    <div id="tune">
+      <div id="sliders"></div>
+      <div class="pads">
+        <button data-pad="drums"><span class="sw" style="background:#FF5A4E"></span>Drum</button>
+        <button data-pad="plucks"><span class="sw" style="background:#B8F15A"></span>Pluck</button>
+        <button data-pad="bass"><span class="sw" style="background:#7a4bb0"></span>Bass</button>
+        <button id="tap">Tap tempo</button>
+        <button id="stems">Load stems…</button>
+        <input id="stemfiles" type="file" accept="audio/*" multiple hidden>
+        <button id="copy">Copy values</button>
+      </div>
+    </div>
+    <div class="row">
+      <button id="cambtn" class="big">Start camera</button>
+      <button id="sndbtn">Sound</button>
+      <button id="micbtn">Mic</button>
+      <button id="demobtn">Demo</button>
+      <button id="playbtn">Pause</button>
+      <button id="nextbtn" title="Next state">›</button>
+      <button id="tunebtn">Tune</button>
+      <button id="cleanbtn" title="Hide the controls">◻</button>
+    </div>
+  </div>
+</div>
+<div id="toast" hidden></div>
+
+<script>
+"use strict";
+/* ---- the lists for this sketch ---- */
+const STATES = [
+  ['WAITING', 'Step up and dance'],
+  ['TAKE',    'Dance 8 bars · sweep your arms on the beat'],
+  ['LOOPS',   'Step back and watch your ghost'],
+  ['NEXT',    'Next player · dance with the ghost']
+];
+const KNOBS = [
+  ['Tempo',      'Tempo bpm',             60, 220, 1,   128],
+  ['Bars',       'Take length bars',       2,  16, 1,     8],
+  ['Loops',      'Ghost loops',            2,   5, 1,     3],
+  ['Trail',      'Trail length s',       0.2,   6, .1,    2],
+  ['Sweep',      'Sweep to play deg',     10, 150, 1,    45],
+  ['Window',     'On the beat window',  0.05, 0.5, .01, .2],
+  ['Swell',      'Sphere swell',           0,   1, .01, .55],
+  ['Smooth',     'Sphere melt px',         2,  60, 1,    22],
+  ['Ghostalpha', 'Ghost see-through',      0,   1, .01, .4],
+  ['Dim',        'Waiting dim',            0,   1, .01, .3],
+  ['Camscale',   'Cutout size',          0.5, 1.6, .01,  1],
+  ['Camx',       'Cutout across',       -0.4, 0.4, .01,  0],
+  ['Edge',       'Cutout edge softness', 0.05, 0.6, .01, .2]
+];
+const W = 720, H = 1280;                 /* the 9 × 16 wall */
+const TINT = { drums: [255, 150, 140], plucks: [215, 248, 160], bass: [190, 160, 235], none: [255, 255, 255] };
+/* where the channels sit on the wall (px): drums top left, plucks top right, bass along the bottom */
+const ZONE = { drums: {x: W * .3, y: H * .3, r: 110}, plucks: {x: W * .7, y: H * .3, r: 110}, bassY: H * .78 };
+const S = 1.35;                           /* the stand-in skeleton, bigger for the tall wall */
+
+const $ = id => document.getElementById(id);
+let held = false;
+function toast(msg, long){ const t = $('toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toast.t); toast.t = setTimeout(()=>{ t.hidden = true; }, long ? 4000 : 1600); }
+
+/* sliders */
+const si = {};
+const K = k => +si[k].r.value;
+for (const [k, label, lo, hi, step, def] of KNOBS){
+  const row = document.createElement('div'); row.className = 'sl';
+  const lb = document.createElement('label'); lb.textContent = label; lb.htmlFor = 's-' + k;
+  const r = document.createElement('input'); r.type = 'range'; r.id = 's-' + k; r.min = lo; r.max = hi; r.step = step; r.value = def;
+  const dp = step >= 1 ? 0 : 2;
+  const o = document.createElement('span'); o.className = 'rt'; o.textContent = (+def).toFixed(dp);
+  r.addEventListener('input', () => { o.textContent = (+r.value).toFixed(dp); });
+  row.append(lb, r, o); $('sliders').append(row); si[k] = {r, o, dp};
+}
+$('tunebtn').addEventListener('click', () => { const on = $('tune').classList.toggle('open'); $('tunebtn').classList.toggle('on', on); });
+$('cleanbtn').addEventListener('click', () => { document.body.classList.add('clean'); toast('Tap the wall for the controls'); });
+$('copy').addEventListener('click', () => {
+  const lines = [`# ${STATES[cur][0]} · Ghost Soloist Phone`];
+  for (const [k] of KNOBS) lines.push(`${k} = ${K(k).toFixed(si[k].dp ? 3 : 0)}`);
+  navigator.clipboard?.writeText(lines.join('\n')).then(() => toast('Values copied')).catch(() => toast('Copy blocked'));
+});
+
+/* ================================================================ the band: a swung 4/4 stand-in at Tempo */
+let beat = 0, lastBeat = 0;
+const env = {drums: 0, plucks: 0, bass: 0};
+const hash = n => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+/* ---- sound: a small synth band in Web Audio. Starts from the Sound button (phones only play after a tap). ---- */
+let actx = null, snd = null;
+function makeSound(){
+  actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+  const out = actx.createGain(); out.gain.value = .8; out.connect(actx.destination);
+  const nz = actx.createBuffer(1, actx.sampleRate, actx.sampleRate), d = nz.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const g = (v, t, a, r) => { const x = actx.createGain(); x.gain.setValueAtTime(0, t); x.gain.linearRampToValueAtTime(v, t + a); x.gain.exponentialRampToValueAtTime(.001, t + a + r); x.connect(out); return x; };
+  return {
+    kick(t, v){ const o = actx.createOscillator(); o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(42, t + .12);
+      o.connect(g(.9 * v, t, .004, .22)); o.start(t); o.stop(t + .3); },
+    snare(t, v){ const s = actx.createBufferSource(); s.buffer = nz; const f = actx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1800; f.Q.value = .7;
+      s.connect(f); f.connect(g(.45 * v, t, .002, .16)); s.start(t); s.stop(t + .25);
+      const o = actx.createOscillator(); o.frequency.value = 190; o.connect(g(.3 * v, t, .002, .08)); o.start(t); o.stop(t + .12); },
+    ride(t, v){ const s = actx.createBufferSource(); s.buffer = nz; const f = actx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 6500;
+      s.connect(f); f.connect(g(.16 * v, t, .002, .28)); s.start(t); s.stop(t + .35); },
+    bass(t, hz, v){ const o = actx.createOscillator(); o.type = 'triangle'; o.frequency.value = hz; const f = actx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 420;
+      o.connect(f); f.connect(g(.5 * v, t, .01, .42)); o.start(t); o.stop(t + .5); },
+    pluck(t, hz, v){ const o = actx.createOscillator(); o.type = 'square'; o.frequency.value = hz; const f = actx.createBiquadFilter(); f.type = 'lowpass';
+      f.frequency.setValueAtTime(3200, t); f.frequency.exponentialRampToValueAtTime(500, t + .25); o.connect(f); f.connect(g(.22 * v, t, .003, .3)); o.start(t); o.stop(t + .4); }
+  };
+}
+let soundOn = false;
+$('sndbtn').addEventListener('click', () => {
+  if (!snd) snd = makeSound();
+  soundOn = !soundOn; $('sndbtn').classList.toggle('on', soundOn);
+  if (soundOn){ actx.resume(); toast('Stand-in band playing'); } else toast('Sound off');
+});
+/* a walking bass line and a few comping notes, in F: the plucks answer the drums' swing */
+const WALK = [87.31, 98, 110, 116.54, 130.81, 116.54, 110, 98, 87.31, 82.41, 73.42, 82.41];
+const COMP = [349.23, 440, 523.25, 587.33, 659.25, 783.99];
+function play(ch, s, ib){
+  if (!soundOn || !snd || stems.length) return;
+  const t = actx.currentTime + .005;
+  if (ch === 'drums'){ if (s >= 1) snd.snare(t, 1); else if (s >= .7) snd.kick(t, 1); else snd.ride(t, 1); }
+  if (ch === 'bass') snd.bass(t, WALK[ib % WALK.length], s);
+  if (ch === 'plucks'){ snd.pluck(t, COMP[Math.floor(hash(ib * 2.3 + 1) * COMP.length)], s); if (hash(ib * 4.1) > .5) snd.pluck(t, COMP[Math.floor(hash(ib * 1.9) * COMP.length)] * .5, s * .7); }
+}
+function bandEvent(ch, s){
+  env[ch] = Math.max(env[ch], s);
+  play(ch, s, Math.floor(beat));
+  if (ch === 'drums') swellKick = Math.max(swellKick, s);
+  if (ch === 'plucks'){ const a = hash(beat * 7.3) * 6.28, d = 20 + 70 * hash(beat * 3.1);
+    addRipple(ZONE.plucks.x + Math.cos(a) * d, ZONE.plucks.y + Math.sin(a) * d, .6 * s); }
+  if (ch === 'bass'){ bassFlare = Math.max(bassFlare, .5 * s); bassX = .3 + .4 * hash(beat); }
+}
+function standIn(dt){
+  const ib = Math.floor(beat), pb = Math.floor(lastBeat), f = beat - ib, pf = lastBeat - pb;
+  if (ib !== pb){
+    bandEvent('drums', ib % 2 ? 1 : .7);
+    env.bass = .55 + .45 * (ib % 4 === 0); play('bass', env.bass, ib);
+    if (hash(ib * 1.7) > .62) bandEvent('plucks', .8);
+  }
+  const sw2 = 2 / 3;
+  if ((pf < sw2 && f >= sw2) || (ib !== pb && pf < sw2)){
+    env.drums = Math.max(env.drums, .45); play('drums', .45, ib);
+    if (hash(ib * 5.9) > .55) bandEvent('plucks', 1);
+  }
+  env.bass = Math.max(env.bass * Math.exp(-dt * 2.5), .3);
+}
+/* stems: drums.wav = loudness, a jump past the threshold is a hit. no_drums.wav: low bins → bass, a jump in the highs → a pluck. */
+let stems = [], anD = null, anO = null, bufD, bufO, prevD = 0, prevHi = 0, avgD = 0, avgHi = 0;
+const ONSET = .12;
+$('stems').addEventListener('click', () => $('stemfiles').click());
+$('stemfiles').addEventListener('change', e => {
+  const files = [...e.target.files]; if (!files.length) return;
+  stems.forEach(s => s.pause()); stems = []; anD = anO = null;
+  actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+  for (const f of files){
+    const a = new Audio(URL.createObjectURL(f)); a.loop = true;
+    const src = actx.createMediaElementSource(a), an = actx.createAnalyser(); an.fftSize = 2048;
+    src.connect(an); an.connect(actx.destination);
+    if (/no_drums|other|no-drums/i.test(f.name) || (anD && !anO)) anO = an; else anD = an;
+    stems.push(a);
+  }
+  bufD = new Float32Array(2048); bufO = new Float32Array(1024);
+  actx.resume(); stems.forEach(a => { a.currentTime = 0; a.play(); });
+  soundOn = false; $('sndbtn').classList.remove('on');
+  toast('Stems playing · tap the tempo', true);
+});
+function fromStems(dt){
+  if (anD){
+    anD.getFloatTimeDomainData(bufD); let s = 0; for (const v of bufD) s += v * v;
+    const rms = Math.min(1, Math.sqrt(s / bufD.length) * 3);
+    avgD += (rms - avgD) * Math.min(1, dt * 4);
+    if (rms - avgD > ONSET && rms > prevD) bandEvent('drums', Math.min(1, .5 + rms));
+    prevD = rms; env.drums = Math.max(env.drums * Math.exp(-dt * 8), rms * .6);
+  }
+  if (anO){
+    anO.getFloatFrequencyData(bufO); const hz = actx.sampleRate / 2 / bufO.length;
+    let lo = 0, nl = 0, hi = 0, nh = 0;
+    bufO.forEach((db, i) => { const fq = i * hz, e = Math.pow(10, db / 20);
+      if (fq > 30 && fq < 250){ lo += e; nl++; } else if (fq > 400 && fq < 5000){ hi += e; nh++; } });
+    lo = Math.min(1, lo / Math.max(1, nl) * 40); hi = Math.min(1, hi / Math.max(1, nh) * 120);
+    env.bass += (lo - env.bass) * Math.min(1, dt * 10);
+    avgHi += (hi - avgHi) * Math.min(1, dt * 4);
+    if (hi - avgHi > ONSET * .6 && hi > prevHi) bandEvent('plucks', Math.min(1, .5 + hi));
+    prevHi = hi;
+  }
+}
+/* the mic: the room (the band) through the phone's microphone. One analyser: lows → bass, a loudness jump → a drum hit,
+   a jump in the highs → a pluck. Rough stand-in for the HPSS split; it's here so the picture can follow a real band. */
+let mic = null, anM = null, bufM, bufMf, prevM = 0, avgM = 0, prevMh = 0, avgMh = 0, micLevel = 0;
+async function startMic(){
+  try {
+    if (!navigator.mediaDevices?.getUserMedia) throw new Error('no microphone on this page');
+    $('micbtn').textContent = 'Asking…';
+    const ask = navigator.mediaDevices.getUserMedia({audio: {echoCancellation: false, noiseSuppression: false, autoGainControl: false}, video: false});
+    const wait = new Promise((_, rej) => setTimeout(() => rej(new Error('no answer')), 8000));
+    const s = await Promise.race([ask, wait]);
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume();
+    mic = s; anM = actx.createAnalyser(); anM.fftSize = 2048; anM.smoothingTimeConstant = .5;
+    actx.createMediaStreamSource(s).connect(anM);      /* not to the speakers: no feedback */
+    bufM = new Float32Array(2048); bufMf = new Float32Array(1024);
+    stems.forEach(a => a.pause()); stems = []; anD = anO = null;
+    soundOn = false; $('sndbtn').classList.remove('on');
+    $('micbtn').textContent = 'Mic on'; $('micbtn').classList.add('on');
+    toast('Mic on · the band through the phone', true);
+  } catch(e){
+    $('micbtn').textContent = 'Mic';
+    toast(inArtifact ? 'The mic is blocked in the Artifact · run serve-https.py on the Mac and open its https link here' : 'Mic: ' + e.message, true);
+  }
+}
+function stopMic(){ if (mic) mic.getTracks().forEach(t => t.stop()); mic = null; anM = null; micLevel = 0; $('micbtn').textContent = 'Mic'; $('micbtn').classList.remove('on'); }
+$('micbtn').addEventListener('click', () => anM ? stopMic() : startMic());
+function fromMic(dt){
+  anM.getFloatTimeDomainData(bufM); let s = 0; for (const v of bufM) s += v * v;
+  const rms = Math.min(1, Math.sqrt(s / bufM.length) * 4); micLevel = rms;
+  avgM += (rms - avgM) * Math.min(1, dt * 4);
+  if (rms - avgM > ONSET * .8 && rms > prevM) bandEvent('drums', Math.min(1, .5 + rms));
+  prevM = rms; env.drums = Math.max(env.drums * Math.exp(-dt * 8), rms * .5);
+  anM.getFloatFrequencyData(bufMf); const hz = actx.sampleRate / 2 / bufMf.length;
+  let lo = 0, nl = 0, hi = 0, nh = 0;
+  bufMf.forEach((db, i) => { const fq = i * hz, e = Math.pow(10, db / 20);
+    if (fq > 30 && fq < 250){ lo += e; nl++; } else if (fq > 400 && fq < 5000){ hi += e; nh++; } });
+  lo = Math.min(1, lo / Math.max(1, nl) * 40); hi = Math.min(1, hi / Math.max(1, nh) * 120);
+  env.bass += (lo - env.bass) * Math.min(1, dt * 10);
+  avgMh += (hi - avgMh) * Math.min(1, dt * 4);
+  if (hi - avgMh > ONSET * .5 && hi > prevMh) bandEvent('plucks', Math.min(1, .5 + hi));
+  prevMh = hi;
+}
+/* the meter: 48 samples of level, newest at the right; the three chips are the band's channels as the picture feels them */
+const vu = $('vu'), vux = vu.getContext('2d'), vuh = new Array(48).fill(0);
+let vuT = 0;
+function drawMeter(dt){
+  vuT += dt; if (vuT >= 1 / 30){ vuT = 0;
+    const lv = anM ? micLevel : (anD || anO) ? Math.max(env.drums, env.bass * .7, env.plucks) : soundOn ? Math.max(env.drums, env.bass * .6, env.plucks) : 0;
+    vuh.push(lv); vuh.shift(); }
+  const w = vu.width, h = vu.height, n = vuh.length, bw = w / n;
+  vux.clearRect(0, 0, w, h);
+  vuh.forEach((v, i) => {
+    const bh = Math.max(3, v * h), x = i * bw + bw * .25, y = (h - bh) / 2;
+    vux.fillStyle = v < .04 ? 'rgba(255,255,255,.18)' : anM ? '#B8F15A' : '#FFA028';
+    vux.beginPath(); vux.roundRect(x, y, bw * .5, bh, 2); vux.fill();
+  });
+  $('mlab').textContent = anM ? 'mic ' + Math.round(micLevel * 100) : (anD || anO) ? 'stems' : soundOn ? 'synth' : 'no sound';
+  const ch = $('chan').children;
+  ch[0].style.setProperty('--lv', Math.round(env.drums * 100) + '%');
+  ch[1].style.setProperty('--lv', Math.round(env.plucks * 100) + '%');
+  ch[2].style.setProperty('--lv', Math.round(env.bass * 100) + '%');
+}
+let taps = [];
+$('tap').addEventListener('click', () => {
+  const now = performance.now(); taps = taps.filter(t => now - t < 2500); taps.push(now);
+  if (taps.length >= 3){ const g = (taps[taps.length - 1] - taps[0]) / (taps.length - 1);
+    const bpm = Math.round(Math.max(60, Math.min(220, 60000 / g))); si.Tempo.r.value = bpm; si.Tempo.o.textContent = bpm;
+    beat = Math.round(beat); lastBeat = beat; toast('Tempo ' + bpm); }
+  else toast('Tap again on the beat');
+});
+for (const b of document.querySelectorAll('[data-pad]')){
+  const ch = b.dataset.pad;
+  b.addEventListener('pointerdown', () => { b.classList.add('on'); bandEvent(ch, 1); if (ch === 'bass'){ env.bass = 1; bassFlare = 1; } });
+  for (const ev of ['pointerup','pointercancel','pointerleave']) b.addEventListener(ev, () => b.classList.remove('on'));
+}
+
+/* ================================================================ the look: Set 3 · Neon cellar, one shader */
+const glc = document.createElement('canvas'); glc.width = W; glc.height = H;
+const gl = glc.getContext('webgl2', {preserveDrawingBuffer: true});
+const VS = `#version 300 es
+in vec2 a; void main(){ gl_Position = vec4(a, 0., 1.); }`;
+const FS = `#version 300 es
+precision highp float;
+uniform vec2 uRes; uniform float uDim, uBass, uBassFlare, uBassX, uSmooth;
+uniform vec4 uSph[10];
+uniform vec4 uRip[12];
+out vec4 o;
+float smin(float a, float b, float k){ float h = clamp(.5 + .5 * (b - a) / k, 0., 1.); return mix(b, a, h) - k * h * (1. - h); }
+float field(vec2 p){ float d = 1e5; for (int i = 0; i < 10; i++){ if (uSph[i].z <= 0.) continue; d = smin(d, length(p - uSph[i].xy) - uSph[i].z, uSmooth); } return d; }
+void main(){
+  vec2 p = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);
+  vec3 col = vec3(18., 10., 12.) / 255.;
+  float y = p.y / uRes.y;
+  vec3 violet = vec3(59., 26., 94.) / 255.;
+  float low = smoothstep(.55, 1., y);
+  float flare = uBassFlare * exp(-pow((p.x / uRes.x - uBassX) * 3.5, 2.));
+  col += violet * low * (1.1 * uBass + 2.4 * flare) * (.3 + .7 * uDim);
+  vec3 lime = vec3(184., 241., 90.) / 255.;
+  for (int i = 0; i < 12; i++){
+    vec4 r = uRip[i]; if (r.w <= 0.) continue;
+    float rad = 10. + r.z * 95.;
+    float d = abs(length(p - r.xy) - rad);
+    float a = r.w * exp(-r.z * 2.6) * (.35 + .65 * uDim);
+    col = mix(col, lime, a * (1. - smoothstep(1., 3., d)));
+    float d2 = abs(length(p - r.xy) - rad * .62);
+    col = mix(col, lime, .45 * a * (1. - smoothstep(.6, 2., d2)));
+  }
+  float f = field(p);
+  if (f < 1.5){
+    float e = 1.5;
+    vec2 g = vec2(field(p + vec2(e, 0.)) - field(p - vec2(e, 0.)), field(p + vec2(0., e)) - field(p - vec2(0., e))) / (2. * e);
+    float t = clamp(-f / 34., 0., 1.);
+    vec3 n = normalize(vec3(g * (1. - t), t * 1.4 + .05));
+    float l = dot(n, normalize(vec3(-.55, -.7, .6)));
+    vec3 coral = vec3(255., 90., 78.) / 255., ox = vec3(122., 30., 42.) / 255.;
+    vec3 tone = mix(ox, coral, smoothstep(.30, .34, l));
+    col = mix(col, tone * (.22 + .78 * uDim), 1. - smoothstep(-1., 1., f));
+  }
+  o = vec4(col, 1.);
+}`;
+let glok = false, U = {};
+(function makeGL(){
+  if (!gl) return;
+  const sh = (t, s) => { const x = gl.createShader(t); gl.shaderSource(x, s); gl.compileShader(x);
+    if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) { console.error(gl.getShaderInfoLog(x)); return null; } return x; };
+  const v = sh(gl.VERTEX_SHADER, VS), fr = sh(gl.FRAGMENT_SHADER, FS); if (!v || !fr) return;
+  const pr = gl.createProgram(); gl.attachShader(pr, v); gl.attachShader(pr, fr); gl.linkProgram(pr);
+  if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) { console.error(gl.getProgramInfoLog(pr)); return; }
+  gl.useProgram(pr);
+  const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(pr, 'a'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  for (const n of ['uRes','uDim','uBass','uBassFlare','uBassX','uSmooth','uSph','uRip']) U[n] = gl.getUniformLocation(pr, n);
+  gl.viewport(0, 0, W, H); glok = true;
+})();
+let swellKick = 0, bassFlare = 0, bassX = .5;
+const ripples = [], wristSph = [];
+function addRipple(x, y, s){ ripples.push({x, y, age: 0, s}); if (ripples.length > 12) ripples.shift(); }
+function drawLook(t, dim){
+  if (!glok) return false;
+  const sph = new Float32Array(40), rip = new Float32Array(48);
+  const sw = 1 + K('Swell') * swellKick * .7;
+  for (let i = 0; i < 4; i++){
+    const a = t * .25 + i * 1.5708, d = 40 + 7 * Math.sin(t * .7 + i);
+    sph.set([ZONE.drums.x + Math.cos(a) * d * 1.1, ZONE.drums.y + Math.sin(a) * d, (36 + 7 * (i % 2)) * sw, 0], i * 4);
+  }
+  wristSph.slice(-6).forEach((s, i) => sph.set([s.x, s.y, s.r * Math.max(0, s.life), 0], (4 + i) * 4));
+  ripples.forEach((r, i) => rip.set([r.x, r.y, r.age, r.s], i * 4));
+  gl.uniform2f(U.uRes, W, H); gl.uniform1f(U.uDim, dim); gl.uniform1f(U.uBass, env.bass);
+  gl.uniform1f(U.uBassFlare, bassFlare); gl.uniform1f(U.uBassX, bassX); gl.uniform1f(U.uSmooth, K('Smooth'));
+  gl.uniform4fv(U.uSph, sph); gl.uniform4fv(U.uRip, rip);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  return true;
+}
+
+/* ================================================================ the body (stand-in / drag): upper body, two-bone arms */
+const UA = 78 * S, FA = 72 * S;
+function elbowFor(s, w){
+  let dx = w.x - s.x, dy = w.y - s.y, d = Math.hypot(dx, dy) || 1;
+  const dm = Math.min(d, UA + FA - 1);
+  const wc = {x: s.x + dx / d * dm, y: s.y + dy / d * dm};
+  const a = Math.acos(Math.max(-1, Math.min(1, (UA * UA + dm * dm - FA * FA) / (2 * UA * dm))));
+  const base = Math.atan2(dy, dx);
+  const e1 = {x: s.x + Math.cos(base + a) * UA, y: s.y + Math.sin(base + a) * UA};
+  const e2 = {x: s.x + Math.cos(base - a) * UA, y: s.y + Math.sin(base - a) * UA};
+  return {e: e1.y > e2.y ? e1 : e2, w: wc};
+}
+function skeleton(b){
+  const ls = {x: b.x - 52 * S, y: b.y}, rs = {x: b.x + 52 * S, y: b.y};
+  const L = elbowFor(ls, b.lw), R = elbowFor(rs, b.rw);
+  return {n: {x: b.x, y: b.y - 72 * S}, c: {x: b.x, y: b.y}, ls, rs, le: L.e, re: R.e, lw: L.w, rw: R.w};
+}
+const CY = H * .52;
+const body = {x: W / 2, y: CY, lw: {x: W / 2 - 110, y: CY + 150}, rw: {x: W / 2 + 110, y: CY + 150}};
+const arms = { l: {chan: 'none', hist: [], fired: -1, trail: []}, r: {chan: 'none', hist: [], fired: -1, trail: []} };
+const ghostArms = { l: {trail: []}, r: {trail: []} };
+let hits = 0, lastErr = 1, sweepNow = 0;
+let demo = true;
+$('demobtn').classList.add('on');
+$('demobtn').addEventListener('click', () => { demo = !demo; $('demobtn').classList.toggle('on', demo); held = false; toast(demo ? 'The demo player dances' : 'Drag a wrist yourself'); });
+
+function demoPose(b, who){
+  const sh = who === 'next' ? 2 : 0;
+  const x = W / 2 + (who === 'next' ? 30 : 0) + 30 * Math.sin(Math.PI * b / 4);
+  const swing = Math.cos(Math.PI * b);
+  const bar = Math.floor(b / 4) + sh;
+  const la = (bar % 4 < 2 ? 215 : 125) + 34 * swing;
+  const ra = (bar % 4 < 2 ? 325 : 55) - 34 * swing;
+  const reach = 148 * S, rad = Math.PI / 180;
+  return {x, y: CY + 5 * Math.sin(Math.PI * b),
+    lw: {x: x - 52 * S + Math.cos(la * rad) * reach, y: CY + Math.sin(la * rad) * reach},
+    rw: {x: x + 52 * S + Math.cos(ra * rad) * reach, y: CY + Math.sin(ra * rad) * reach}};
+}
+function zoneAt(p){
+  if (Math.hypot(p.x - ZONE.drums.x, p.y - ZONE.drums.y) < ZONE.drums.r) return 'drums';
+  if (Math.hypot(p.x - ZONE.plucks.x, p.y - ZONE.plucks.y) < ZONE.plucks.r) return 'plucks';
+  if (p.y > ZONE.bassY) return 'bass';
+  return null;
+}
+function burst(chan, p, ghost){
+  const s = ghost ? K('Ghostalpha') * ghostFade : 1;
+  if (chan === 'drums'){ wristSph.push({x: p.x, y: p.y, r: 44 * (ghost ? .8 : 1), life: 1}); swellKick = Math.max(swellKick, .8 * s); }
+  else if (chan === 'plucks'){ addRipple(p.x, p.y, 1.2 * s); }
+  else if (chan === 'bass'){ bassFlare = Math.max(bassFlare, 1.1 * s); bassX = p.x / W; }
+}
+function armStep(side, s, w, dt){
+  const A = arms[side];
+  const z = zoneAt(w); if (z) A.chan = z;
+  const ang = Math.atan2(w.y - s.y, w.x - s.x) * 180 / Math.PI;
+  const h = A.hist;
+  if (h.length){ let d = ang - h[h.length - 1].raw; d = ((d + 540) % 360) - 180; h.push({b: beat, a: h[h.length - 1].a + d, raw: ang}); }
+  else h.push({b: beat, a: ang, raw: ang});
+  while (h.length && h[0].b < beat - 1) h.shift();
+  let lo = 1e9, hi = -1e9; for (const q of h){ lo = Math.min(lo, q.a); hi = Math.max(hi, q.a); }
+  const sweep = hi - lo; sweepNow = Math.max(sweepNow, sweep);
+  const nb = Math.round(beat), err = Math.abs(beat - nb);
+  if (sweep >= K('Sweep')){
+    if (err <= K('Window') && A.fired !== nb){
+      A.fired = nb; hits++; lastErr = err; burst(A.chan, w, false);
+      if (cur === 1) rec.trig.push({b: clockBeats(), side, chan: A.chan, x: w.x, y: w.y});
+      A.hist = [h[h.length - 1]];
+    } else if (err > K('Window')) lastErr = err;
+  }
+  A.trail.push({x: w.x, y: w.y, t: now, chan: A.chan});
+}
+
+/* ================================================================ the camera: you are the cutout (front camera) */
+const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+const MODEL = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
+const cam = { on: false, pl: null, video: null, src: document.createElement('canvas'), cut: document.createElement('canvas'),
+              sk: null, map: null, lastT: -1, n: 0, seenFor: 0 };
+cam.srcx = cam.src.getContext('2d', {willReadFrequently: true}); cam.cutx = cam.cut.getContext('2d', {willReadFrequently: true});
+async function loadPose(){
+  if (cam.pl) return;
+  toast('Loading MediaPipe…', true);
+  const vision = await import(MP + '/vision_bundle.mjs');
+  const fs = await vision.FilesetResolver.forVisionTasks(MP + '/wasm');
+  const opts = d => ({ baseOptions: {modelAssetPath: MODEL, delegate: d}, runningMode: 'VIDEO', numPoses: 1, outputSegmentationMasks: true });
+  try { cam.pl = await vision.PoseLandmarker.createFromOptions(fs, opts('GPU')); }
+  catch(e){ cam.pl = await vision.PoseLandmarker.createFromOptions(fs, opts('CPU')); }
+}
+const inArtifact = /claude\.ai$|claudeusercontent\.com$/.test(location.hostname);
+async function startCam(){
+  try {
+    const v = cam.video || document.createElement('video');
+    v.muted = true; v.playsInline = true; v.setAttribute('playsinline', '');
+    if (v.srcObject){ v.srcObject.getTracks().forEach(t => t.stop()); v.srcObject = null; }
+    if (!navigator.mediaDevices?.getUserMedia) throw new Error('no camera on this page');
+    $('cambtn').textContent = 'Asking for the camera…';
+    /* the artifact viewer refuses the camera with no prompt and no error: give it 8 s, then say so */
+    const ask = navigator.mediaDevices.getUserMedia({video: {facingMode: 'user', width: {ideal: 720}, height: {ideal: 1280}}, audio: false});
+    const wait = new Promise((_, rej) => setTimeout(() => rej(new Error('no answer')), 8000));
+    v.srcObject = await Promise.race([ask, wait]);
+    cam.video = v; await v.play();
+    await loadPose();
+    cam.on = true; held = false;
+    $('cambtn').textContent = 'Stop camera'; $('cambtn').classList.add('on');
+    toast('Camera on · step back so your head and hands are in');
+  } catch(e){
+    $('cambtn').textContent = 'Start camera';
+    toast(inArtifact ? 'The camera is blocked in the Artifact · run serve-https.py on the Mac and open its https link here'
+                     : 'Camera: ' + e.message, true);
+    console.warn(e);
+  }
+}
+function stopCam(){
+  cam.on = false; cam.sk = null;
+  if (cam.video){ cam.video.pause(); if (cam.video.srcObject) cam.video.srcObject.getTracks().forEach(t => t.stop()); }
+  $('cambtn').textContent = 'Start camera'; $('cambtn').classList.remove('on');
+}
+$('cambtn').addEventListener('click', () => cam.on ? stopCam() : startCam());
+/* the camera picture fills the wall's height × Cutout size, standing on the floor, moved by Cutout across */
+function camMap(){
+  const v = cam.video, ch = H * K('Camscale'), cw = ch * v.videoWidth / v.videoHeight;
+  return {ox: W / 2 - cw / 2 + K('Camx') * W, oy: H - ch, cw, ch};
+}
+function camStep(){
+  const v = cam.video;
+  if (!cam.pl || !v || v.readyState < 2 || v.currentTime === cam.lastT) return;
+  cam.lastT = v.currentTime;
+  const portrait = v.videoHeight > v.videoWidth;
+  const w = portrait ? 288 : 384, h = Math.round(w * v.videoHeight / v.videoWidth);
+  if (cam.src.width !== w || cam.src.height !== h){ cam.src.width = cam.cut.width = w; cam.src.height = cam.cut.height = h; }
+  cam.srcx.drawImage(v, 0, 0, w, h);
+  const r = cam.pl.detectForVideo(cam.src, performance.now());
+  const lm = r.landmarks && r.landmarks[0], mask = r.segmentationMasks && r.segmentationMasks[0];
+  const M = cam.map = camMap();
+  if (!lm){ cam.sk = null; cam.cutx.clearRect(0, 0, w, h); mask && mask.close(); return; }
+  const P = i => ({x: M.ox + (1 - lm[i].x) * M.cw, y: M.oy + lm[i].y * M.ch});   /* mirrored */
+  const ls = P(12), rs = P(11);
+  cam.sk = {n: P(0), c: {x: (ls.x + rs.x) / 2, y: (ls.y + rs.y) / 2}, ls, rs, le: P(14), re: P(13), lw: P(16), rw: P(15)};
+  if (mask){
+    const m = mask.getAsFloat32Array(), id = cam.srcx.getImageData(0, 0, w, h), d = id.data;
+    const e = K('Edge'), lo = .5 - e / 2, sc = 1 / e;
+    for (let i = 0, j = 3; i < m.length; i++, j += 4){ let a = (m[i] - lo) * sc; a = a < 0 ? 0 : a > 1 ? 1 : a; d[j] = a * a * (3 - 2 * a) * 255; }
+    cam.cutx.putImageData(id, 0, 0);
+    mask.close();
+    if (cur === 1 && cam.n++ % 2 === 0){
+      const g = document.createElement('canvas'); g.width = 144; g.height = Math.round(144 * h / w);
+      const gx = g.getContext('2d'); gx.drawImage(cam.cut, 0, 0, g.width, g.height);
+      gx.globalCompositeOperation = 'source-in'; gx.fillStyle = '#E6D9FF'; gx.fillRect(0, 0, g.width, g.height);
+      rec.cut.push({b: clockBeats(), c: g}); rec.map = M;
+    }
+  }
+}
+function drawCut(img, M, alpha){
+  cx.save(); cx.globalAlpha = alpha; cx.translate(M.ox + M.cw, M.oy); cx.scale(-1, 1);
+  cx.drawImage(img, 0, 0, M.cw, M.ch); cx.restore();
+}
+
+/* ================================================================ the take and the ghost */
+let rec = {f: [], trig: [], beats: 32, cut: [], map: null};
+const clockBeats = () => clock * K('Tempo') / 60;
+function recFrame(sk){ rec.f.push({b: clockBeats(), sk: JSON.parse(JSON.stringify(sk)), ch: [arms.l.chan, arms.r.chan]}); }
+function sampleRec(b){
+  const f = rec.f; if (f.length < 2) return null;
+  let lo = 0, hi = f.length - 1;
+  while (hi - lo > 1){ const m = (lo + hi) >> 1; if (f[m].b <= b) lo = m; else hi = m; }
+  return f[lo];
+}
+function sampleCut(b){
+  const f = rec.cut; if (!f.length) return null;
+  const T = rec.beats; b = ((b % T) + T) % T;
+  let lo = 0, hi = f.length - 1;
+  while (hi - lo > 1){ const m = (lo + hi) >> 1; if (f[m].b <= b) lo = m; else hi = m; }
+  return f[lo].c;
+}
+const lerpP = (a, b, k) => ({x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k});
+function ghostAt(gb){
+  const T = rec.beats, b = ((gb % T) + T) % T;
+  const a = sampleRec(b); if (!a) return null;
+  const k = Math.max(0, (b - (T - .5)) / .5);
+  if (k <= 0) return a;
+  const z = rec.f[0], sk = {};
+  for (const n in a.sk) sk[n] = lerpP(a.sk[n], z.sk[n], k);
+  return {b, sk, ch: a.ch};
+}
+let ghostFade = 1, ghostBeat = 0, lastGhostB = 0;
+
+/* ================================================================ the round */
+let cur = 0, clock = 0, now = 0, paused = false;
+let DUR = [];
+function durs(){ const bar = 4 * 60 / K('Tempo'), B = K('Bars'); DUR = [2 * bar, B * bar, B * bar, (K('Loops') - 1) * B * bar]; }
+durs();
+function enter(i){
+  if (i === 1){ rec = {f: [], trig: [], beats: K('Bars') * 4, cut: [], map: null}; hits = 0; }
+  if (i === 2 || i === 3) ghostBeat = i === 2 ? 0 : rec.beats;
+  if (i === 2 && rec.f.length < 2) makeDemoTake();
+}
+function makeDemoTake(){
+  rec = {f: [], trig: [], beats: K('Bars') * 4, cut: [], map: null};
+  for (let b = 0; b < rec.beats; b += 1 / 30){
+    const p = demoPose(b, 'take'), sk = skeleton(p);
+    rec.f.push({b, sk, ch: [zoneAt(sk.lw) || 'drums', zoneAt(sk.rw) || 'plucks']});
+    if (Math.abs(b - Math.round(b)) < 1 / 60) rec.trig.push({b, side: 'l', chan: zoneAt(sk.lw) || 'drums', x: sk.lw.x, y: sk.lw.y});
+  }
+}
+function jumpTo(i){ cur = (i + STATES.length) % STATES.length; enter(cur); clock = 0; if (cur === 2 || cur === 3) ghostBeat += clockBeats(); }
+$('nextbtn').addEventListener('click', () => { jumpTo(cur + 1); toast(STATES[cur][0]); });
+$('playbtn').addEventListener('click', () => { paused = !paused; $('playbtn').textContent = paused ? 'Play' : 'Pause'; $('playbtn').classList.toggle('on', paused); });
+
+/* the wall: drag a wrist, or the chest to move the body (when the camera is off) */
+const feed = $('feed'), cx = feed.getContext('2d');
+let dragDot = null;
+const feedXY = e => { const r = feed.getBoundingClientRect(); return {x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H}; };
+feed.addEventListener('pointerdown', e => {
+  if (document.body.classList.contains('clean')){ document.body.classList.remove('clean'); return; }
+  if (cam.on) return;
+  const p = feedXY(e), sk = skeleton(body);
+  const cands = [['lw', sk.lw], ['rw', sk.rw], ['c', sk.c], ['c', sk.n]];
+  let best = null; for (const [k, q] of cands){ const d = Math.hypot(q.x - p.x, q.y - p.y); if (d < 70 && (!best || d < best[1])) best = [k, d]; }
+  dragDot = best ? best[0] : (p.x < W / 2 ? 'lw' : 'rw');
+  held = true; feed.setPointerCapture(e.pointerId); moveDot(p);
+});
+function moveDot(p){
+  if (dragDot === 'c'){ const dx = p.x - body.x, dy = p.y - body.y; body.x += dx; body.y += dy;
+    body.lw = {x: body.lw.x + dx, y: body.lw.y + dy}; body.rw = {x: body.rw.x + dx, y: body.rw.y + dy}; }
+  else body[dragDot] = p;
+}
+feed.addEventListener('pointermove', e => { if (dragDot) moveDot(feedXY(e)); });
+feed.addEventListener('pointerup', () => { dragDot = null; });
+feed.addEventListener('pointercancel', () => { dragDot = null; });
+
+/* ================================================================ the 2D layers over the shader */
+const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+function drawTrail(tr, alpha){
+  const L = K('Trail');
+  while (tr.length && now - tr[0].t > L) tr.shift();
+  if (tr.length < 2) return;
+  cx.lineCap = 'round'; cx.lineJoin = 'round';
+  for (let pass = 0; pass < 2; pass++){
+    for (let i = 1; i < tr.length; i++){
+      const a = tr[i - 1], b = tr[i], age = (now - b.t) / L;
+      const tint = b.chan === 'none' ? [255, 255, 255] : TINT[b.chan].map(v => Math.round(v * .55 + 255 * .45));
+      const lv = b.chan === 'none' ? .3 : env[b.chan];
+      const k = (1 - age) * alpha;
+      cx.strokeStyle = rgba(tint, pass ? k : k * .18);
+      cx.lineWidth = pass ? 3 + 6 * lv * (1 - age) : 14 + 16 * lv * (1 - age);
+      cx.beginPath(); cx.moveTo(a.x, a.y); cx.lineTo(b.x, b.y); cx.stroke();
+    }
+  }
+}
+function drawBody(sk, colr, alpha, chans, lw){
+  cx.strokeStyle = rgba(colr, alpha); cx.lineWidth = lw; cx.lineCap = 'round';
+  const seg = (a, b) => { cx.beginPath(); cx.moveTo(a.x, a.y); cx.lineTo(b.x, b.y); cx.stroke(); };
+  seg(sk.ls, sk.rs); seg(sk.ls, sk.le); seg(sk.le, sk.lw); seg(sk.rs, sk.re); seg(sk.re, sk.rw);
+  seg(sk.c, {x: sk.c.x, y: sk.c.y + 70 * S});
+  cx.beginPath(); cx.arc(sk.n.x, sk.n.y, 26 * S, 0, 6.283); cx.stroke();
+  [[sk.lw, chans[0]], [sk.rw, chans[1]]].forEach(([p, ch]) => {
+    cx.fillStyle = ch === 'none' ? rgba([255,255,255], alpha) : rgba(TINT[ch], alpha);
+    cx.beginPath(); cx.arc(p.x, p.y, 12, 0, 6.283); cx.fill();
+  });
+}
+function paint(t, show){
+  const dim = cur === 0 ? K('Dim') : 1;
+  if (drawLook(t, dim)) cx.drawImage(glc, 0, 0);
+  else { cx.fillStyle = '#120A0C'; cx.fillRect(0, 0, W, H); }
+  if (show.gcut && rec.map) drawCut(show.gcut, rec.map, K('Ghostalpha') * ghostFade);
+  if (show.cut && cam.map) drawCut(show.cut, cam.map, 1);
+  cx.globalCompositeOperation = 'lighter';
+  if (show.ghost){ const ga = K('Ghostalpha') * ghostFade; drawTrail(ghostArms.l.trail, ga); drawTrail(ghostArms.r.trail, ga); }
+  if (show.body){ drawTrail(arms.l.trail, 1); drawTrail(arms.r.trail, 1); }
+  else { arms.l.trail.length = 0; arms.r.trail.length = 0; }
+  cx.globalCompositeOperation = 'source-over';
+  if (show.ghost && show.gsk && !show.gcut) drawBody(show.gsk, [230, 217, 255], K('Ghostalpha') * ghostFade, show.gch, 9);
+  if (show.body && !show.cut) drawBody(show.sk, [236, 236, 236], .9, [arms.l.chan, arms.r.chan], 5);
+  if (show.cut) [[show.sk.lw, arms.l.chan], [show.sk.rw, arms.r.chan]].forEach(([p, ch]) => {
+    cx.fillStyle = ch === 'none' ? 'rgba(255,255,255,.9)' : rgba(TINT[ch], .95);
+    cx.beginPath(); cx.arc(p.x, p.y, 11, 0, 6.283); cx.fill(); });
+}
+
+/* ================================================================ the frame loop */
+let last = performance.now(), fps = 60, frames = 0, fpsT = last;
+function step(ts){
+  const dt = Math.min(.05, (ts - last) / 1000); last = ts; now = ts / 1000;
+  frames++; if (ts - fpsT > 500){ fps = frames * 1000 / (ts - fpsT); frames = 0; fpsT = ts; }
+  durs();
+  if (!paused){
+    lastBeat = beat; beat += dt * K('Tempo') / 60;
+    clock += dt;
+    if (cam.on && cur === 0) clock = Math.min(clock, DUR[0] * .99);   /* the camera waits for a body */
+    if (clock > DUR[cur]){ clock -= DUR[cur]; cur = (cur + 1) % STATES.length; held = held && cur !== 0; enter(cur); }
+    if (cur === 2 || cur === 3){ lastGhostB = ghostBeat; ghostBeat += dt * K('Tempo') / 60; }
+  }
+  const dtF = paused ? 0 : dt;
+  if (anM) fromMic(dt); else if (anD || anO) fromStems(dtF); else if (dtF) standIn(dtF);
+  drawMeter(dt);
+  for (const k in env) if (k !== 'bass') env[k] *= Math.exp(-dtF * 7);
+  swellKick *= Math.exp(-dtF * 6); bassFlare *= Math.exp(-dtF * 2.2);
+  ripples.forEach(r => r.age += dtF); while (ripples.length && ripples[0].age > 1.6) ripples.shift();
+  wristSph.forEach(s => s.life -= dtF * 1.6); while (wristSph.length && wristSph[0].life <= 0) wristSph.shift();
+
+  if (cam.on) camStep();
+  const camBody = cam.on && cam.sk;
+  cam.seenFor = camBody ? cam.seenFor + dt : 0;
+  if (camBody && cur === 0 && cam.seenFor > 1 && !paused){ cur = 1; clock = 0; enter(1); }
+  const bodyOn = camBody ? true : cam.on ? false : held || cur === 1 || cur === 3 || demo;
+  if (!cam.on && !held && demo && bodyOn){
+    Object.assign(body, demoPose(cur === 1 ? clockBeats() : beat, cur === 3 ? 'next' : 'take'));
+  }
+  const sk = camBody ? cam.sk : skeleton(body);
+  sweepNow *= Math.exp(-dtF * 3);
+  if (bodyOn && dtF){ armStep('l', sk.ls, sk.lw, dtF); armStep('r', sk.rs, sk.rw, dtF); }
+  if (cur === 1 && dtF) recFrame(sk);
+
+  let gsk = null, gch = null;
+  const ghostOn = cur === 2 || cur === 3;
+  if (ghostOn){
+    const T = rec.beats, nLoops = K('Loops'), li = Math.floor(ghostBeat / T);
+    ghostFade = li >= nLoops - 1 ? Math.max(0, 1 - (ghostBeat - (nLoops - 1) * T) / T) : 1;
+    const g = ghostAt(ghostBeat);
+    if (g){ gsk = g.sk; gch = g.ch;
+      if (dtF){ ghostArms.l.trail.push({x: gsk.lw.x, y: gsk.lw.y, t: now, chan: gch[0]}); ghostArms.r.trail.push({x: gsk.rw.x, y: gsk.rw.y, t: now, chan: gch[1]}); }
+      const a = ((lastGhostB % T) + T) % T, b = ((ghostBeat % T) + T) % T;
+      for (const q of rec.trig) if ((a <= b && q.b > a && q.b <= b) || (a > b && (q.b > a || q.b <= b))) burst(q.chan, {x: q.x, y: q.y}, true);
+    }
+  } else { ghostArms.l.trail.length = 0; ghostArms.r.trail.length = 0; }
+
+  /* the words */
+  const B = K('Bars'), barNo = Math.min(B, Math.floor(clockBeats() / 4) + 1);
+  const left = cur === 1 ? `bar ${barNo} of ${B}`
+    : ghostOn ? `loop ${Math.min(K('Loops'), Math.floor(ghostBeat / rec.beats) + 1)} of ${K('Loops')}`
+    : Math.max(0, DUR[cur] - clock).toFixed(1) + ' s left';
+  $('state').textContent = STATES[cur][0] + (held ? ' · you drive' : '');
+  $('prompt').textContent = STATES[cur][1];
+  $('c-hands').textContent = cam.on ? (camBody ? 'camera · body seen' : 'camera · no body') : bodyOn ? (demo && !held ? 'demo player' : 'your drag') : 'no body';
+  $('c-hands').classList.toggle('good', !!camBody);
+  $('c-left').textContent = left; $('c-hits').textContent = hits + ' hits'; $('c-fps').textContent = fps.toFixed(0) + ' fps';
+  const h = $('hint');
+  const onBeat = bodyOn && Math.max(0, 1 - 2 * lastErr) >= 1 - 2 * K('Window');
+  let txt, good = false;
+  if (!bodyOn) txt = ghostOn ? 'Watch your ghost play with the band' : 'Step up and dance';
+  else if (sweepNow < K('Sweep') * .75) txt = 'Sweep an arm wider';
+  else if (sweepNow < K('Sweep')) txt = 'A little wider';
+  else if (!onBeat) txt = 'Land the sweep on the beat';
+  else { txt = 'On the beat — keep sweeping'; good = true; }
+  h.textContent = txt; h.classList.toggle('good', good);
+
+  paint(now, {body: bodyOn, sk, ghost: ghostOn, gsk, gch,
+    cut: camBody ? cam.cut : null, gcut: ghostOn && rec.cut.length ? sampleCut(ghostBeat) : null});
+}
+function frame(ts){ step(ts); requestAnimationFrame(frame); }
+if (!glok) toast('WebGL 2 is off · the look is not drawn', true);
+requestAnimationFrame(frame);
+</script>
