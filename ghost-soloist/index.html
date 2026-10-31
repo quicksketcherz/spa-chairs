@@ -124,6 +124,7 @@ const KNOBS = [
   ['Loops',      'Ghost loops',            2,   5, 1,     3],
   ['Trail',      'Trail length s',       0.2,   6, .1,    2],
   ['Pulse',      'Pulse amount',         0.5,   8, .1,    3],
+  ['Phase',      'Colour phase speed',     0,   2, .05,  .3],
   ['Micgain',    'Mic gain',               1,  12, .5,    4],
   ['Sweep',      'Sweep to play deg',     10, 150, 1,    45],
   ['Window',     'On the beat window',  0.05, 0.5, .01, .2],
@@ -137,6 +138,14 @@ const KNOBS = [
 ];
 const W = 720, H = 1280;                 /* the 9 × 16 wall */
 const TINT = { drums: [130, 150, 255], plucks: [255, 140, 235], bass: [255, 200, 120], none: [255, 255, 255] };
+/* the colours phase like the stage lights: the shader and the trails share one clock */
+let phase = 0;
+const mixc = (a, b, k) => a.map((v, i) => Math.round(v + (b[i] - v) * k));
+function phaseTints(){
+  TINT.drums = mixc([130, 150, 255], [190, 130, 255], .5 + .5 * Math.sin(phase));
+  TINT.plucks = mixc([255, 140, 235], [255, 160, 170], .5 + .5 * Math.sin(phase * 1.3 + 4));
+  TINT.bass = mixc([255, 200, 120], [255, 150, 150], .5 + .5 * Math.sin(phase + 2.1));
+}
 /* where the channels sit on the wall (px): drums top left, plucks top right, bass along the bottom */
 const ZONE = { drums: {x: W * .3, y: H * .3, r: 110}, plucks: {x: W * .7, y: H * .3, r: 110}, bassY: H * .78 };
 const S = 1.35;                           /* the stand-in skeleton, bigger for the tall wall */
@@ -357,7 +366,7 @@ const VS = `#version 300 es
 in vec2 a; void main(){ gl_Position = vec4(a, 0., 1.); }`;
 const FS = `#version 300 es
 precision highp float;
-uniform vec2 uRes; uniform float uDim, uBass, uBassFlare, uBassX, uSmooth;
+uniform vec2 uRes; uniform float uDim, uBass, uBassFlare, uBassX, uSmooth, uPh;
 uniform vec4 uSph[28];
 uniform vec4 uRip[12];
 out vec4 o;
@@ -367,11 +376,11 @@ void main(){
   vec2 p = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);
   vec3 col = vec3(11., 7., 22.) / 255.;            // room · violet-black
   float y = p.y / uRes.y;
-  vec3 violet = vec3(120., 70., 24.) / 255.;        // bass · the gold snare, low on the wall
+  vec3 violet = mix(vec3(120., 70., 24.), vec3(140., 40., 60.), .5 + .5 * sin(uPh + 2.1)) / 255.;   // bass · gold ↔ amber-rose
   float low = smoothstep(.55, 1., y);
   float flare = uBassFlare * exp(-pow((p.x / uRes.x - uBassX) * 3.5, 2.));
   col += violet * low * (1.1 * uBass + 2.4 * flare) * (.3 + .7 * uDim);
-  vec3 lime = vec3(255., 79., 216.) / 255.;         // plucks · magenta rims
+  vec3 lime = mix(vec3(255., 79., 216.), vec3(255., 120., 140.), .5 + .5 * sin(uPh * 1.3 + 4.)) / 255.;   // plucks · magenta ↔ pink
   for (int i = 0; i < 12; i++){
     vec4 r = uRip[i]; if (r.w <= 0.) continue;
     float rad = 10. + r.z * 95.;
@@ -388,7 +397,8 @@ void main(){
     float t = clamp(-f / 34., 0., 1.);
     vec3 n = normalize(vec3(g * (1. - t), t * 1.4 + .05));
     float l = dot(n, normalize(vec3(-.55, -.7, .6)));
-    vec3 coral = vec3(74., 108., 255.) / 255., ox = vec3(34., 22., 120.) / 255.;   // drums · blue chrome, indigo shadow
+    float k = .5 + .5 * sin(uPh);
+    vec3 coral = mix(vec3(74., 108., 255.), vec3(150., 70., 255.), k) / 255., ox = mix(vec3(34., 22., 120.), vec3(60., 18., 110.), k) / 255.;   // drums · blue ↔ violet
     vec3 tone = mix(ox, coral, smoothstep(.30, .34, l));
     col = mix(col, tone * (.22 + .78 * uDim), 1. - smoothstep(-1., 1., f));
   }
@@ -406,7 +416,7 @@ let glok = false, U = {};
   const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
   const loc = gl.getAttribLocation(pr, 'a'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-  for (const n of ['uRes','uDim','uBass','uBassFlare','uBassX','uSmooth','uSph','uRip']) U[n] = gl.getUniformLocation(pr, n);
+  for (const n of ['uRes','uDim','uBass','uBassFlare','uBassX','uSmooth','uPh','uSph','uRip']) U[n] = gl.getUniformLocation(pr, n);
   gl.viewport(0, 0, W, H); glok = true;
 })();
 let swellKick = 0, bassFlare = 0, bassX = .5, beatPulse = 0;
@@ -435,7 +445,7 @@ function drawLook(t, dim){
   }
   ripples.forEach((r, i) => rip.set([r.x, r.y, r.age, r.s], i * 4));
   gl.uniform2f(U.uRes, W, H); gl.uniform1f(U.uDim, dim); gl.uniform1f(U.uBass, env.bass);
-  gl.uniform1f(U.uBassFlare, bassFlare); gl.uniform1f(U.uBassX, bassX); gl.uniform1f(U.uSmooth, K('Smooth'));
+  gl.uniform1f(U.uBassFlare, bassFlare); gl.uniform1f(U.uBassX, bassX); gl.uniform1f(U.uSmooth, K('Smooth')); gl.uniform1f(U.uPh, phase);
   gl.uniform4fv(U.uSph, sph); gl.uniform4fv(U.uRip, rip);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   return true;
@@ -742,6 +752,7 @@ function step(ts){
   const dtF = paused ? 0 : dt;
   if (Math.floor(beat) !== Math.floor(lastBeat)) beatPulse = 1;      /* every beat: a pulse the trails and spheres ride */
   beatPulse *= Math.exp(-dtF * 6);
+  phase += dtF * K('Phase'); phaseTints();
   if (anM) fromMic(dt); else if (anD || anO) fromStems(dtF); else if (dtF) standIn(dtF);
   drawMeter(dt);
   for (const k in env) if (k !== 'bass') env[k] *= Math.exp(-dtF * 7);
