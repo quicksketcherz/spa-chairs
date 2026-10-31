@@ -144,7 +144,8 @@ const mixc = (a, b, k) => a.map((v, i) => Math.round(v + (b[i] - v) * k));
 function phaseTints(){
   const ph = ((phase / 6.2832) % 1 + 1) % 1 * 4, C = [[130,150,255],[190,130,255],[255,140,235],[255,200,120]], i = Math.floor(ph) % 4;
   TINT.drums = mixc(C[i], C[(i + 1) % 4], ph - Math.floor(ph));
-  TINT.plucks = mixc([255, 140, 235], [255, 160, 170], .5 + .5 * Math.sin(phase * 1.3 + 4));
+  const pr = ((phase / 6.2832 + .5) % 1 + 1) % 1 * 4, P = [[255,140,235],[255,200,120],[130,150,255],[190,130,255]], j = Math.floor(pr) % 4;
+  TINT.plucks = mixc(P[j], P[(j + 1) % 4], pr - Math.floor(pr));
   TINT.bass = mixc([255, 200, 120], [255, 150, 150], .5 + .5 * Math.sin(phase + 2.1));
 }
 /* where the channels sit on the wall (px): drums top left, plucks top right, bass along the bottom */
@@ -367,9 +368,9 @@ const VS = `#version 300 es
 in vec2 a; void main(){ gl_Position = vec4(a, 0., 1.); }`;
 const FS = `#version 300 es
 precision highp float;
-uniform vec2 uRes; uniform float uDim, uBass, uBassFlare, uBassX, uSmooth, uPh;
+uniform vec2 uRes; uniform float uDim, uBass, uBassFlare, uBassX, uSmooth, uPh, uPulse;
 uniform vec4 uSph[28];
-uniform vec4 uRip[12];
+uniform vec4 uRip[28];
 out vec4 o;
 float smin(float a, float b, float k){ float h = clamp(.5 + .5 * (b - a) / k, 0., 1.); return mix(b, a, h) - k * h * (1. - h); }
 float field(vec2 p){ float d = 1e5; for (int i = 0; i < 28; i++){ if (uSph[i].z <= 0.) continue; d = smin(d, length(p - uSph[i].xy) - uSph[i].z, uSmooth); } return d; }
@@ -381,12 +382,14 @@ void main(){
   float low = smoothstep(.55, 1., y);
   float flare = uBassFlare * exp(-pow((p.x / uRes.x - uBassX) * 3.5, 2.));
   col += violet * low * (1.1 * uBass + 2.4 * flare) * (.3 + .7 * uDim);
-  vec3 lime = mix(vec3(255., 79., 216.), vec3(255., 120., 140.), .5 + .5 * sin(uPh * 1.3 + 4.)) / 255.;   // plucks · magenta ↔ pink
-  for (int i = 0; i < 12; i++){
+  float phr = fract(uPh / 6.2832 + .5) * 4.;    // the rings phase the same palette, half a cycle behind the cloud
+  vec3 r0 = vec3(255., 79., 216.), r1 = vec3(255., 178., 74.), r2 = vec3(74., 108., 255.), r3 = vec3(150., 70., 255.);
+  vec3 lime = (phr < 1. ? mix(r0, r1, phr) : phr < 2. ? mix(r1, r2, phr - 1.) : phr < 3. ? mix(r2, r3, phr - 2.) : mix(r3, r0, phr - 3.)) / 255.;
+  for (int i = 0; i < 28; i++){
     vec4 r = uRip[i]; if (r.w <= 0.) continue;
-    float rad = 10. + r.z * 95.;
+    float rad = 10. + r.z * (95. + 50. * uPulse);
     float d = abs(length(p - r.xy) - rad);
-    float a = r.w * exp(-r.z * 2.6) * (.35 + .65 * uDim);
+    float a = r.w * exp(-r.z * 2.2) * (.35 + .65 * uDim) * (1. + .6 * uPulse);
     col = mix(col, lime, a * (1. - smoothstep(1., 3., d)));
     float d2 = abs(length(p - r.xy) - rad * .62);
     col = mix(col, lime, .45 * a * (1. - smoothstep(.6, 2., d2)));
@@ -421,15 +424,15 @@ let glok = false, U = {};
   const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
   const loc = gl.getAttribLocation(pr, 'a'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-  for (const n of ['uRes','uDim','uBass','uBassFlare','uBassX','uSmooth','uPh','uSph','uRip']) U[n] = gl.getUniformLocation(pr, n);
+  for (const n of ['uRes','uDim','uBass','uBassFlare','uBassX','uSmooth','uPh','uPulse','uSph','uRip']) U[n] = gl.getUniformLocation(pr, n);
   gl.viewport(0, 0, W, H); glok = true;
 })();
 let swellKick = 0, bassFlare = 0, bassX = .5, beatPulse = 0;
 const ripples = [], wristSph = [];
-function addRipple(x, y, s){ ripples.push({x, y, age: 0, s}); if (ripples.length > 12) ripples.shift(); }
+function addRipple(x, y, s){ ripples.push({x, y, age: 0, s}); if (ripples.length > 28) ripples.shift(); }
 function drawLook(t, dim){
   if (!glok) return false;
-  const sph = new Float32Array(112), rip = new Float32Array(48);
+  const sph = new Float32Array(112), rip = new Float32Array(112);
   const sw = 1 + K('Swell') * swellKick * .7 + (anM ? K('Pulse') * .25 * micLevel : 0);
   for (let i = 0; i < 4; i++){
     const a = t * .25 + i * 1.5708, d = 40 + 7 * Math.sin(t * .7 + i);
@@ -450,7 +453,7 @@ function drawLook(t, dim){
   }
   ripples.forEach((r, i) => rip.set([r.x, r.y, r.age, r.s], i * 4));
   gl.uniform2f(U.uRes, W, H); gl.uniform1f(U.uDim, dim); gl.uniform1f(U.uBass, env.bass);
-  gl.uniform1f(U.uBassFlare, bassFlare); gl.uniform1f(U.uBassX, bassX); gl.uniform1f(U.uSmooth, K('Smooth')); gl.uniform1f(U.uPh, phase);
+  gl.uniform1f(U.uBassFlare, bassFlare); gl.uniform1f(U.uBassX, bassX); gl.uniform1f(U.uSmooth, K('Smooth')); gl.uniform1f(U.uPh, phase); gl.uniform1f(U.uPulse, Math.min(2, K('Pulse') * (.3 * beatPulse + .3 * env.plucks + (anM ? micLevel : 0)) / 3));
   gl.uniform4fv(U.uSph, sph); gl.uniform4fv(U.uRip, rip);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   return true;
@@ -525,6 +528,10 @@ function armStep(side, s, w, dt){
     } else if (err > K('Window')) lastErr = err;
   }
   A.trail.push({x: w.x, y: w.y, t: now, chan: A.chan});
+  if (A.chan === 'plucks'){
+    const lastP = A.lastRip || {x: 0, y: 0}, moved = Math.hypot(w.x - lastP.x, w.y - lastP.y);
+    if (moved > 28){ addRipple(w.x, w.y, .5 + .5 * Math.min(1, moved / 120)); A.lastRip = {x: w.x, y: w.y}; }
+  }
 }
 
 /* ================================================================ the camera: you are the cutout (front camera) */
@@ -699,7 +706,7 @@ function drawTrail(tr, alpha){
     for (let pass = 0; pass < 3; pass++){
       for (let i = 1 + off; i < tr.length; i++){
         const a = tr[i - 1 - off], b = tr[i - off], head = tr[i], age = (now - head.t) / L;
-        if (head.chan === 'drums' && alpha >= 1) continue;
+        if ((head.chan === 'drums' || head.chan === 'plucks') && alpha >= 1) continue;
         const tint = head.chan === 'none' ? [255, 255, 255] : TINT[head.chan].map(v => Math.round(v * .7 + 255 * .3));
         const lv = (head.chan === 'none' ? .3 : env[head.chan]) + (anM ? micLevel : 0);
         const pulse = 1 + K('Pulse') * (.6 * beatPulse + lv) * (1 - age);
