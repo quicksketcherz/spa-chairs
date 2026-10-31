@@ -676,18 +676,24 @@ function drawTrail(tr, alpha){
   while (tr.length && now - tr[0].t > L) tr.shift();
   if (tr.length < 2) return;
   cx.lineCap = 'round'; cx.lineJoin = 'round';
-  for (let pass = 0; pass < 2; pass++){
-    for (let i = 1; i < tr.length; i++){
-      const a = tr[i - 1], b = tr[i], age = (now - b.t) / L;
-      if (b.chan === 'drums' && alpha >= 1) continue;      /* the live drum trail is the cloud in the shader */
-      const tint = b.chan === 'none' ? [255, 255, 255] : TINT[b.chan].map(v => Math.round(v * .8 + 255 * .2));
-      /* the pulse: the beat itself, plus what the band (or the mic) is doing now, strongest on the newest part of the trail */
-      const lv = (b.chan === 'none' ? .3 : env[b.chan]) + (anM ? micLevel : 0);
-      const pulse = 1 + K('Pulse') * (.6 * beatPulse + lv) * (1 - age);
-      const k = Math.min(1, (1 - age) * alpha * (.55 + .45 * pulse));
-      cx.strokeStyle = rgba(tint, pass ? k : k * .2);
-      cx.lineWidth = pass ? 3 * pulse : 12 + 12 * pulse;
-      cx.beginPath(); cx.moveTo(a.x, a.y); cx.lineTo(b.x, b.y); cx.stroke();
+  /* a light trail: a thin bright core with a soft glow round it, and echoes — the same path drawn again lagging a
+     beat and two behind, fainter each time. The drums arm is the cloud in the shader instead. */
+  const lag = Math.round(60 * 60 / K('Tempo') / 2);           /* about half a beat of samples, at 60 fps */
+  const echoes = [[0, 1], [lag, .45], [lag * 2, .22]];
+  for (const [off, ea] of echoes){
+    for (let pass = 0; pass < 3; pass++){
+      for (let i = 1 + off; i < tr.length; i++){
+        const a = tr[i - 1 - off], b = tr[i - off], head = tr[i], age = (now - head.t) / L;
+        if (head.chan === 'drums' && alpha >= 1) continue;
+        const tint = head.chan === 'none' ? [255, 255, 255] : TINT[head.chan].map(v => Math.round(v * .7 + 255 * .3));
+        const lv = (head.chan === 'none' ? .3 : env[head.chan]) + (anM ? micLevel : 0);
+        const pulse = 1 + K('Pulse') * (.6 * beatPulse + lv) * (1 - age);
+        const k = Math.min(1, (1 - age) * alpha * ea * (.5 + .5 * pulse));
+        const w = pass === 0 ? 18 + 14 * pulse : pass === 1 ? 6 + 4 * pulse : 1.6 + .6 * pulse;
+        cx.strokeStyle = pass === 2 ? rgba([255, 255, 255], k) : rgba(tint, pass ? k * .35 : k * .12);
+        cx.lineWidth = w;
+        cx.beginPath(); cx.moveTo(a.x, a.y); cx.lineTo(b.x, b.y); cx.stroke();
+      }
     }
   }
 }
